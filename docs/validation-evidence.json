@@ -1,0 +1,46 @@
+{
+  "date": "2026-10-08",
+  "version": "0.1.0-r1",
+  "source_checks": {
+    "passed": [
+      "all_8_reference_xlsx_values_headers_readonly_legacy_long_host_import",
+      "native_matlab_v73_table_string_missing_and_v7_artifact_precision_scope",
+      "qt_window_preview_worker_state_screenshots_manifest_settings_dialog",
+      "long_values_shapes_identity_missing_zero_precision",
+      "duplicate_cells_ambiguous_axes_duplicate_headers_malformed_rows",
+      "explicit_sample_coordinate_value_mapping",
+      "exact_metadata_join_label_alignment_host_real_import_selection",
+      "single_channel_11_metrics_band_pair_graph_and_failed_qa",
+      "batch_failure_isolation_repeat_no_reentry_cancel_atomicity_merge_conflict"
+    ]
+  },
+  "host_integration": {
+    "menu_before": "disabled",
+    "settings": "enabled",
+    "menu_after": "enabled",
+    "launch": "started_and_alive_then_test_child_closed",
+    "configured_user_settings": "C:\\Users\\Lenovo\\AppData\\Roaming\\PY-ML\\plugins.json",
+    "release": "F:\\桌面\\程序\\PY-ML-support\\dist\\HyperEEG-0.1.0-r1\\PYML-DataConversion"
+  },
+  "frozen": {
+    "frozen_csv": "passed_with_host_load_dataset_and_exact_text",
+    "frozen_native_v73": "passed_with_embedded_matlab_bridge",
+    "csv_rows": 2,
+    "native_rows": 2,
+    "python_required": false,
+    "matlab_for_mat": true
+  },
+  "formal_manifest": {
+    "formal_xlsx_reference": "passed",
+    "recursive_mat_dedup": "passed",
+    "samples": 2,
+    "features": 3
+  },
+  "real_acquisition_mat_validated": false,
+  "cleanup": {
+    "status": "blocked_by_automatic_safety_review",
+    "tool_reason": "blocked by policy",
+    "retried": false,
+    "local_process_files_retained": true
+  }
+}

@@ -2,7 +2,7 @@
 
 ## Background and context
 
-PY-ML currently loads CSV/XLSX/XLS tables and has no external plugin interface.
+PY-ML loads CSV/XLSX/XLS tables and now has a manifest-v1 external plugin interface.
 The user requests optional batch data conversion, with the plugin code and package
 in this repository. User datasets are converted locally for PY-ML, not uploaded.
 
@@ -40,8 +40,9 @@ interpreter selection, paths containing Chinese/spaces, persistence, menu order,
 disabled/enabled state and a detached synthetic process launch. Delete temporary
 scripts and generated data after verification.
 
-## Pending product details
+## HyperEEG implementation
 
-Batch conversion is required. Source formats, feature/target mapping, row/column
-orientation, per-file versus merged output and supported conversion operations
-remain to be specified by the user.
+The HyperEEG converter is implemented. Its scoped design, actual source-to-table
+mapping and validation are documented in `docs/hypereeg-design.md`,
+`docs/HyperEEG使用说明.md` and `docs/validation-summary.md`. Other projects remain
+separate future work; no format is inferred merely from a project name.
