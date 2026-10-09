@@ -1,0 +1,13 @@
+/.venv/
+/_internal/
+/*.exe
+/pyml-plugin.json
+/SHA256SUMS.txt
+/使用说明.txt
+/build/
+/dist/
+__pycache__/
+*.py[cod]
+*.log
+.pytest_cache/
+/pyfnirs_converter/matlab/create_pyfnirs_mlinput_fixture.m

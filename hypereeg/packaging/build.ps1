@@ -19,9 +19,10 @@ try {
         schema_version = 1; id = 'data-conversion'; name = '数据转换 · HyperEEG'; version = '0.1.0'
         entrypoint = @{kind = 'executable'; path = 'PYML-DataConversion.exe'}
     } | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath "$releasePath/pyml-plugin.json" -Encoding utf8
-    Copy-Item -LiteralPath 'docs/HyperEEG使用说明.md' -Destination "$releasePath/使用说明.md"
-    if (Test-Path -LiteralPath 'docs/validation-summary.md') {
-        Copy-Item -LiteralPath 'docs/validation-summary.md' -Destination "$releasePath/validation-summary.md"
+    $docsRoot = [System.IO.Path]::GetFullPath((Join-Path $projectRoot '../docs'))
+    Copy-Item -LiteralPath (Join-Path $docsRoot 'HyperEEG使用说明.md') -Destination "$releasePath/使用说明.md"
+    if (Test-Path -LiteralPath (Join-Path $docsRoot 'validation-summary.md')) {
+        Copy-Item -LiteralPath (Join-Path $docsRoot 'validation-summary.md') -Destination "$releasePath/validation-summary.md"
     }
     if (Test-Path -LiteralPath $zipPath) { throw "发行压缩包已经存在，请保留原包并选择新版本：$zipPath" }
     Compress-Archive -LiteralPath $releasePath -DestinationPath $zipPath

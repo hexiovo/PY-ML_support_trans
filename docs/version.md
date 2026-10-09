@@ -1,5 +1,27 @@
 # 版本记录
 
+## 2026-10-09 — 收整为 docs、hypereeg、pyfnirs 三个目录
+
+- GitHub 内容收整为 `docs`、`hypereeg`、`pyfnirs` 三个顶层目录；README 和本版本记录归入 docs，两套源码、启动入口、依赖清单及构建配置归入对应转换器目录。prompts、tests、测试工具、旧计划及原根目录文件不再纳入 GitHub。
+- 按用户选择，完整冻结 EXE 仅留本地，分别位于 `hypereeg` 和 `pyfnirs` 目录，可直接由主程序选择；目录内 `.gitignore` 排除 EXE、`_internal`、成品清单及构建产物。既有 HyperEEG 设置同步更新，未设置的 PYfNIRs 槽仍由用户自行选择。
+- 成品 1,183 个文件及所有迁移源码/配置的迁移前后 SHA-256 均一致；两套迁移后源码 GUI 实际启动、全部 Python 源码 AST 解析、host 普通及 PYfNIRs 来源检测、两个 PowerShell 构建脚本语法检查通过。HyperEEG 构建脚本调整共享 docs 的相对位置，操作说明更新目录及开发环境创建方式；未重新构建 EXE或执行数据转换核心回归。
+- 本地 `.venv`、prompts、tests、tools、六个原根目录文件及测试专用 MATLAB 夹具生成器的删除被自动审批拒绝，仅返回 blocked by policy，尚未删除。已生成 docs/cleanup-once.cmd（纯 ASCII、CRLF）供用户执行；真实 CMD `/check` 成功识别全部 11 个目标，未执行删除，成功后脚本删除自身。脚本及本地待清理内容不会提交 GitHub，`.git` 仅作为本地仓库元数据保留。
+- 发布目标为 support/master；本次仅调整目录与路径，插件版本保持 0.1.0。
+
+## 2026-10-09 — 修正一次性清理 CMD 的编码与换行
+
+- 初版脚本在用户 CMD 中出现断行、路径错误和中文乱码；检查确认文件使用 UTF-8、仅 LF 换行，六个待删文件均仍存在。
+- 修正为无 BOM 的纯 ASCII 脚本及 CRLF 换行，旧 spec 通过 `%~dp0` 定位。增加 `/check` 只读模式；真实 CMD 检查成功识别全部六个目标，退出码为 0，未执行删除。
+- 用户可再次运行原 `call` 命令。全部文件删除成功后脚本删除自身，失败则保留脚本并报告剩余文件；此前自动审批拒绝的删除仍待用户执行。
+
+## 2026-10-09 — 可直接选择的插件整理与项目清理
+
+- 将最终 HyperEEG 发行完整迁至仓库根目录 `HyperEEG-DataConversion`，将 PYfNIRs 发行完整迁至 `PYfNIRs-DataConversion`。在 PY-ML 分别通过“插件 → 设置…”和“格式 → 数据转换 → PYfNIRs 设置…”选择具体插件目录，保留 EXE、manifest 和 `_internal`。
+- 迁移后逐项核对 HyperEEG 923 个文件、PYfNIRs 260 个文件的 SHA-256，全部与迁移前一致；既有 HyperEEG 用户设置同步更新。当前 host 的普通及 PYfNIRs 来源检测均通过，两个冻结 EXE 在新位置实际创建 Qt 窗口并正常退出；此次没有重新测试转换核心。
+- 清理本仓库 `build`、旧 `dist`（含失败 staging 目录、重复/旧 ZIP）、生成的合成测试数据和 Python 缓存。源码、正式测试及夹具生成脚本、requirements 清单、`.venv`、正式 spec、使用说明和 Git 历史保留；与 PY-ML 合计清理 95 项目标、41,204 个原有文件，逻辑体积约 15.396 GiB，这些目标全部删除成功。旧自动生成 `PYML-DataConversion.spec` 收尾删除被自动审批拒绝，尚未删除。
+- README、PYfNIRs 使用说明和 HyperEEG 验证摘要更新当前路径；根目录 `SHA256SUMS.txt` 记录两个 EXE 与两个 manifest 的现有哈希，`.gitignore` 排除整理后的二进制目录。原构建脚本仍生成 `dist`，之后的新发行需选择其实际目录。
+- C:/Users/Lenovo/.codex 未发现可确认属于本项目的 temp/tmp；当前 Codex 数据目录为 E:/CodexData，共享插件和运行文件保留。本轮临时脚本、清理清单及 smoke 产物的收尾删除也被自动审批拒绝（仅返回 blocked by policy）；一次性清理剩余文件.cmd 精确列出旧 spec 和本轮五个临时文件，供用户执行，全部成功后删除自身。两个插件版本保持 0.1.0。
+
 ## 2026-10-09 — PYfNIRs G4 host 接入阶段三独立复核
 
 - 阶段三正式独立 verdict 已登记 PASS：21/21 criteria PASS，含 16 项真实 host 接口检查和 5 项冻结材料/运行证据复用；正式报告与 RUN 哈希见 docs/PYfNIRs验证摘要.md。
@@ -76,6 +98,14 @@
 - 基础数值、映射、标签和真实 PY-ML 读取接口、批处理容错/取消/防重入检查通过；8 份参考 XLSX 的完整值与表头往返通过。原生 MAT 与发行验证继续进行，尚不宣称真实采集 MAT 通过。
 - 未改动主程序文件、HyperEEG 计算源码或原始数据。
 
+## 2026-10-08 — HexiPlan 项目接入提示词
+
+- 新增一份可直接粘贴并附项目对话链接的完整 TXT 提示词，包含解析、实现、验证与交付流程。
+- 按用户要求另保存三个可独立执行的阶段 TXT；完整提示词无需逐份粘贴。
+- 模板使用默认常规档和无需人工审核流程，按固定入口核对真实模型/代理能力，保留必要权限与关键数据映射确认。
+- 明确独立插件目录、现有菜单与清单接口、批处理正确性、发行验证、共享文件协调、版本维护及 Git master 范围。
+- 本轮只编写提示词，没有启动 HexiPlan、实现具体转换器或改动主程序。
+
 ## 2026-10-08 — 插件接入接口准备
 
 - 代码仓库克隆至指定目录，使用 master 分支。
@@ -86,3 +116,20 @@
 - 主程序接入的 12 项定向检查和 GUI/worker 30 项源码比对通过，源码设置窗口截图及实际冻结菜单位置、禁用状态完成核对。
 - 主程序标准版 EXE 与本机 APP 入口已刷新；转换器尚未加入，因此当前入口仍为灰色。
 - 本仓库 master 初始内容为接入接口说明及实现计划；实际转换包在后续项目接入时加入。
+
+## 2026-10-08 — PYfNIRs 步骤二执行包拆分与路由前置状态
+
+- 新增 `prompts/11a-results.txt` 与 `prompts/11b-gui.txt`，将已批准执行包 11 拆为 core/results 与 GUI 两个窄执行范围；两份文件引用 G4 内容哈希 `388c512da6b20913c2917be276b7ebc83a9ead64c434b5b76438b3951cd9962c`，不复制或重写 32 项注册内容。
+- RUN 步骤二保持 `execution`，首步仍为 `ACCEPTED`、修复轮次未重置；记录 adapter 与 GUI Luna lease，旧 pending_init 实例不计入。实际模型路由仍为 `UNVERIFIED`。
+- 依据原 prompt 11，业务文件写入仍受可信路由元数据前置条件约束；这次只完成执行范围整理和状态登记，没有宣称转换器实现、测试或数据验证完成。
+## 2026-10-08 — 步骤二恢复授权记录与公共 API 骨架
+
+- 保留 `prompts/10`、`11`、`12` 的旧路由前置原文，并追加只适用于本 RUN 的恢复说明；另在 `11a-results.txt`、`11b-gui.txt` 中保持一致。RUN note seq 56记录用户真实“执行”、常规档偏好、协调上下文解释及Astra/Sol补充确认，且继续将 actual model routing 标记为 `UNVERIFIED`。
+- 新增 `pyfnirs_converter/api.py` 公共类型与函数签名骨架，绑定步骤二 G4 哈希 `388c512da6b20913c2917be276b7ebc83a9ead64c434b5b76438b3951cd9962c`。四个公共入口的签名导入检查通过；核心转换逻辑仍待完成。
+- GUI 所需 `PySide6==6.11.2` 已存在于现有 `requirements.txt` 和锁文件中，本次未添加依赖。此记录不宣称转换、GUI 或真实数据验证已完成。
+
+## 2026-10-09 — XLSX 字符串字面值保真补充
+
+- XLSX writer 将所有字符串显式保存为文本单元格，防止以 `=` 开头的 ObservationID、标签、FeatureID 或来源字符串被识别为公式；CSV 仍原样写出，不添加改变数据的前缀。
+- IO 回读检查覆盖 `=OBS-42`、`=control`、`=F-O2` 和 Provenance 来源字符串；openpyxl 普通视图及 `data_only=True` 均读回原值。合成 I/O 检查不代表真实研究数据验证。
+- `.venv\Scripts\python.exe -m unittest discover -s tests -t . -v`：23 项通过，1 项 GUI 集成检查因未设置 `PYFNIRS_STUDY_EXPORT_FIXTURE` 按门控跳过。指定经批准的 fixture 路径后，该 GUI 集成流程另有 4 项通过证据。

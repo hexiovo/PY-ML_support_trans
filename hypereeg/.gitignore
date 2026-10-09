@@ -1,0 +1,13 @@
+/.venv/
+/_internal/
+/*.exe
+/pyml-plugin.json
+/SHA256SUMS.txt
+/使用说明.md
+/validation-summary.md
+/build/
+/dist/
+__pycache__/
+*.py[cod]
+*.log
+.pytest_cache/

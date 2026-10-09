@@ -4,9 +4,9 @@
 
 ## 交付与环境
 
-- 最终发行目录：`F:/桌面/程序/PY-ML-support/dist/HyperEEG-0.1.0-r1/PYML-DataConversion`。
+- 当前发行目录：`F:/桌面/程序/PY-ML-support/hypereeg`。2026-10-09 从原 `dist/HyperEEG-0.1.0-r1/PYML-DataConversion` 完整迁移，923 个文件 SHA-256 均一致。
 - EXE：`PYML-DataConversion.exe`；清单 v1 的启动路径指向该真实文件，窗口启动验证通过后才生成。
-- 插件独立环境：Python 3.12.14、pandas 3.0.6、NumPy 2.5.3、openpyxl 3.1.5、PySide6 6.11.2、PyInstaller 6.22.3；完整版本见 requirements-lock.txt。
+- 插件独立环境：Python 3.12.14、pandas 3.0.6、NumPy 2.5.3、openpyxl 3.1.5、PySide6 6.11.2、PyInstaller 6.22.3；完整版本见 hypereeg/requirements-lock.txt。
 - Windows 发行自带 Python/表格/Qt 运行依赖；CSV/XLSX 转换不需外部 Python。MAT 仍需已安装且有许可的 MATLAB，本机验证使用 `G:/matlab/bin/matlab.exe`。
 - 主程序源码与已有发行未修改或重建；其原有未提交改动保持。系统插件设置通过主程序真实 PluginSettingsDialog 保存至 `%APPDATA%/PY-ML/plugins.json`。
 
@@ -45,4 +45,4 @@ Qt 整合检查为程序调用真实控件类与槽函数，没有宣称人工�
 
 ## 复核入口
 
-运行 `python launch.py --preview "正式特征表.csv"` 或使用独立窗口预览；`packaging/build.ps1 -Revision 新修订号` 可重建新目录发行并执行 EXE 启动截图检查。临时测试脚本不属于发行或永久测试基础设施；本轮清理被安全审查拒绝，仍保留在本地。
+在仓库的 `hypereeg` 目录运行 `python launch.py --preview "正式特征表.csv"` 或使用独立窗口预览；`packaging/build.ps1 -Revision 新修订号` 可重建新目录发行并执行 EXE 启动截图检查。临时测试脚本不属于发行或永久测试基础设施；2026-10-09 收整已删除测试目录、夹具和临时验证工具。

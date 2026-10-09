@@ -9,9 +9,9 @@
 3. 点击保存，**插件 → 数据转换** 会启用，点击后打开独立中文窗口。
 4. 也可以直接双击 `PYML-DataConversion.exe`，独立于主程序使用。
 
-源码运行：Python 3.12 环境中 `pip install -r requirements.txt`，然后 `python launch.py`。
+源码运行：先进入仓库的 `hypereeg` 目录，在 Python 3.12 环境中 `pip install -r requirements.txt`，然后 `python launch.py`。
 源码仓库根目录故意没有正式清单，避免把未构建环境声明为可用发行。
-构建：建议 Python 3.12.14，安装 `requirements-lock.txt`，在 PowerShell 执行 `./packaging/build.ps1`。不要用 Python 3.12.0 构建（其冻结字节码处理存在已知缺陷）。构建脚本保留已经存在的发行 ZIP；改版后另建不同名称的压缩包。
+构建：在仓库的 `hypereeg` 目录中操作，建议 Python 3.12.14，安装 `requirements-lock.txt`，在 PowerShell 执行 `./packaging/build.ps1`。不要用 Python 3.12.0 构建（其冻结字节码处理存在已知缺陷）。构建脚本保留已经存在的发行 ZIP；改版后另建不同名称的压缩包。
 
 ## 输入与具体映射
 

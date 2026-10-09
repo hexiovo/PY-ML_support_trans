@@ -67,4 +67,4 @@ A＝已有固定科学输出；B＝已有输出但需专门汇总/投影/身份�
 - 独立 expected 核对得到的顺序值为 `[2.5, 0.25, 0.3, NaN]`，有效掩码为 `[true, true, true, false]`，缺失原因是 `source_nonfinite`；身份为 `OBS-SYN-17 / REC-SYN-17 / SUB-SYN-9`，目标标签为 `synthetic_case`。这证明的是合成夹具闭环，不是真实研究数据验证。
 - 其余 29 项保持 `unverified`；跨脑 IBS 第 15 项也保持 `unverified`。当前支持目录提供 CSV 文件组和 XLSX；提议的 `MLInput.mat` 权威输出尚未实现，读取原生 MAT 仍通过 MATLAB bridge。
 
-完整运行记录：RUN `evidence/raw-feature-production-closure-r1.json`，SHA256 `9b22dc32ae80c558f3ff6394c1c60884aa078a08796408ff361becbb71b82a06`。顶层状态与每个限定条件的来源证据见 [`../pyfnirs_converter/capabilities.json`](../pyfnirs_converter/capabilities.json)。操作流程见[转换器使用说明](PYfNIRs转换器使用说明.md)。
+完整运行记录：RUN `evidence/raw-feature-production-closure-r1.json`，SHA256 `9b22dc32ae80c558f3ff6394c1c60884aa078a08796408ff361becbb71b82a06`。顶层状态与每个限定条件的来源证据见 [`../pyfnirs/pyfnirs_converter/capabilities.json`](../pyfnirs/pyfnirs_converter/capabilities.json)。操作流程见[转换器使用说明](PYfNIRs转换器使用说明.md)。

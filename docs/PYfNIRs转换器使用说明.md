@@ -4,7 +4,7 @@
 
 ## 发行版与 PY-ML 主程序入口
 
-当前 Windows 发行目录为 `F:\桌面\程序\PY-ML-support\dist\PYfNIRs-DataConversion`，入口 EXE 为 `F:\桌面\程序\PY-ML-support\dist\PYfNIRs-DataConversion\PYfNIRs-DataConversion.exe`。启动时保留并复制整个 `PYfNIRs-DataConversion` 目录，包括 `_internal`、EXE 和 `pyml-plugin.json`；不要单独移动 EXE。需要放到其他位置时，完整复制目录，再在 PY-ML 设置中选择新目录。
+当前 Windows 发行目录为 `F:\桌面\程序\PY-ML-support\pyfnirs`，入口 EXE 为 `F:\桌面\程序\PY-ML-support\pyfnirs\PYfNIRs-DataConversion.exe`。启动时保留并复制整个 `PYfNIRs-DataConversion` 目录，包括 `_internal`、EXE 和 `pyml-plugin.json`；不要单独移动 EXE。需要放到其他位置时，完整复制目录，再在 PY-ML 设置中选择新目录。
 
 发行清单 `pyml-plugin.json` 使用 `source_project=PYfNIRs` 标识来源。通过 PY-ML 源码主程序接入时，运行 `F:\桌面\程序\PY-ML\run_pyml_workbench.bat`，在菜单中打开 **格式 → 数据转换 → PYfNIRs 设置…**，选择上面的发行目录并保存；随后从 **格式 → 数据转换 → PYfNIRs** 启动转换器。PYfNIRs 使用独立设置槽，不会覆盖“插件”菜单的通用数据转换设置。未配置或所选目录无效时，PYfNIRs 菜单项保持禁用。
 
@@ -14,11 +14,11 @@
 
 工具可检查 `.mat` 文件和符合转换契约的 `study_export.json`。读取原生 MATLAB 文件时需要本机安装且有许可的外部 MATLAB；本次原生 MAT 验证使用 MATLAB R2023a，需在界面中选择 `matlab.exe`。符合契约的 `study_export.json` 由工具直接读取，不需要 MATLAB。
 
-`study-defined` 适配器只搬运规范 Study 中已经登记的 `FeatureDefinitions` 与 `Values`，不代表 32 类原生 raw Results 都已实现。原生候选项只有在界面显示“已支持”或“条件支持”时才可选择；其具体字段、参数和限制以 [能力注册表](../pyfnirs_converter/capabilities.json) 和[兼容矩阵](compatibility.md)为准。未验证或不支持的候选项会显示原因并保持不可选。
+`study-defined` 适配器只搬运规范 Study 中已经登记的 `FeatureDefinitions` 与 `Values`，不代表 32 类原生 raw Results 都已实现。原生候选项只有在界面显示“已支持”或“条件支持”时才可选择；其具体字段、参数和限制以 [能力注册表](../pyfnirs/pyfnirs_converter/capabilities.json) 和[兼容矩阵](compatibility.md)为准。未验证或不支持的候选项会显示原因并保持不可选。
 
 ## 图形界面
 
-正式发行版可直接运行上一节列出的 EXE；下面的命令用于支持源码目录的开发环境：
+正式发行版可直接运行上一节列出的 EXE；下面的命令需先进入仓库的 `pyfnirs` 目录，并按 [仓库说明](README.md)创建该目录的开发环境：
 
 ```powershell
 .\.venv\Scripts\python.exe -X utf8 -B -m pyfnirs_converter
@@ -64,7 +64,7 @@ PY-ML 的表格读取接口支持从 CSV 或指定工作表读取，例如 `load
 
 ## 原生能力状态与限制
 
-32 类原生 raw Results 候选中，只有以下 3 个明确子形态为条件支持：第 07 项的静态 Pearson FC 边（`ModelIndex=1`，并要求明确且唯一的节点顺序、匹配的对称矩阵和参数指纹）；第 14 项的非窗口 MVAR-Granger 有向边（`Status=ok`，公式、方向约定和节点顺序一致）；第 24 项的 `TotalPersistence` 标量（状态、节点顺序、输入语义、阈值和距离定义一致）。其余 29 项及这三类之外的其他子形态保持 `unverified`，不能从“文件可读取”推断为已支持。完整条件见[兼容矩阵](compatibility.md)与[能力注册表](../pyfnirs_converter/capabilities.json)。
+32 类原生 raw Results 候选中，只有以下 3 个明确子形态为条件支持：第 07 项的静态 Pearson FC 边（`ModelIndex=1`，并要求明确且唯一的节点顺序、匹配的对称矩阵和参数指纹）；第 14 项的非窗口 MVAR-Granger 有向边（`Status=ok`，公式、方向约定和节点顺序一致）；第 24 项的 `TotalPersistence` 标量（状态、节点顺序、输入语义、阈值和距离定义一致）。其余 29 项及这三类之外的其他子形态保持 `unverified`，不能从“文件可读取”推断为已支持。完整条件见[兼容矩阵](compatibility.md)与[能力注册表](../pyfnirs/pyfnirs_converter/capabilities.json)。
 
 发行版目前输出 CSV 文件组或 XLSX 工作簿；提议的权威 `MLInput.mat` 输出尚未实现。所有发行验证与上表示例使用合成夹具，不代表真实研究数据、设备同步或训练结果已经验证。
 
