@@ -1,0 +1,454 @@
+--- a/src/pyml_workbench/gui.py
++++ b/src/pyml_workbench/gui.py
+@@ -40,7 +40,12 @@
+ )
+ from .checkpoints import CheckpointError, load_checkpoint, save_checkpoint
+ from .runtime import worker_command
+-from .plugins import PluginError, PluginSettingsStore, detect_data_conversion
++from .plugins import (
++    PluginError,
++    PluginSettingsStore,
++    detect_data_conversion,
++    detect_pyfnirs_data_conversion,
++)
+ from .run_timing import (
+     RunTiming,
+     SHORT_STEP_REFERENCE_SECONDS,
+@@ -1165,6 +1170,9 @@
+         self.plugin_settings_store = PluginSettingsStore(
+             self.preference_store.path.with_name("plugins.json")
+         )
++        self.pyfnirs_plugin_settings_store = PluginSettingsStore(
++            self.preference_store.path.with_name("pyfnirs_plugins.json")
++        )
+         self.logging_controller = logging_controller
+         self._log_failure_bridge = _LogFailureBridge(self)
+         self._log_failure_bridge.failed.connect(
+@@ -1179,6 +1187,7 @@
+         self._connect_ui()
+         self._load_preferences()
+         self.refresh_plugins()
++        self.refresh_pyfnirs_plugin()
+         self._interaction_filter = _InteractionEventFilter(
+             QApplication.instance(), self.logging_controller, self
+         )
+@@ -1341,6 +1350,24 @@
+             lambda _checked=False: self.set_log_directory(None)
+         )
+         file_menu.addAction(self.reset_log_directory_action)
++        self.format_menu = self.menuBar().addMenu("格式")
++        self.data_conversion_menu = self.format_menu.addMenu("数据转换")
++        self.pyfnirs_conversion_action = QAction("PYfNIRs", self)
++        self.pyfnirs_conversion_action.setObjectName("pyfnirsConversionAction")
++        self.pyfnirs_conversion_action.setEnabled(False)
++        self.pyfnirs_conversion_action.triggered.connect(
++            self.open_pyfnirs_data_conversion
++        )
++        self.data_conversion_menu.addAction(self.pyfnirs_conversion_action)
++        self.data_conversion_menu.addSeparator()
++        self.pyfnirs_plugin_settings_action = QAction("PYfNIRs 设置…", self)
++        self.pyfnirs_plugin_settings_action.setObjectName("pyfnirsPluginSettingsAction")
++        self.pyfnirs_plugin_settings_action.triggered.connect(
++            self.show_pyfnirs_plugin_settings
++        )
++        self.data_conversion_menu.addAction(self.pyfnirs_plugin_settings_action)
++        self.format_menu.aboutToShow.connect(self.refresh_pyfnirs_plugin)
++        self.data_conversion_menu.aboutToShow.connect(self.refresh_pyfnirs_plugin)
+         plugin_menu = self.menuBar().addMenu("插件")
+         self.data_conversion_action = QAction("数据转换…", self)
+         self.data_conversion_action.setObjectName("dataConversionAction")
+@@ -1382,6 +1409,20 @@
+             self.data_conversion_action.setEnabled(True)
+             self.data_conversion_action.setToolTip(f"{plugin.name} {plugin.version}")
+ 
++    def refresh_pyfnirs_plugin(self) -> None:
++        try:
++            pyfnirs_plugin = detect_pyfnirs_data_conversion(
++                self.pyfnirs_plugin_settings_store.load()
++            )
++        except PluginError as exc:
++            self.pyfnirs_conversion_action.setEnabled(False)
++            self.pyfnirs_conversion_action.setToolTip(str(exc))
++        else:
++            self.pyfnirs_conversion_action.setEnabled(True)
++            self.pyfnirs_conversion_action.setToolTip(
++                f"{pyfnirs_plugin.name} {pyfnirs_plugin.version}"
++            )
++
+     def show_plugin_settings(self) -> None:
+         from .plugin_dialog import PluginSettingsDialog
+ 
+@@ -1404,6 +1445,35 @@
+             QMessageBox.warning(
+                 self, "无法启动数据转换",
+                 "请检查插件运行环境，并在“插件 → 设置”中重新选择目录或 Python 程序。",
++            )
++
++    def show_pyfnirs_plugin_settings(self) -> None:
++        from .plugin_dialog import PyfNIRsPluginSettingsDialog
++
++        dialog = PyfNIRsPluginSettingsDialog(
++            self.pyfnirs_plugin_settings_store, self
++        )
++        dialog.exec()
++        self.refresh_pyfnirs_plugin()
++        dialog.deleteLater()
++
++    def open_pyfnirs_data_conversion(self) -> None:
++        try:
++            plugin = detect_pyfnirs_data_conversion(
++                self.pyfnirs_plugin_settings_store.load()
++            )
++        except PluginError as exc:
++            self.refresh_pyfnirs_plugin()
++            QMessageBox.warning(self, "PYfNIRs 转换不可用", str(exc))
++            return
++        started, _pid = QProcess.startDetached(
++            plugin.program, list(plugin.arguments), str(plugin.directory)
++        )
++        if not started:
++            QMessageBox.warning(
++                self,
++                "无法启动 PYfNIRs 转换器",
++                "请检查 PYfNIRs 专用发行目录与真实启动文件，并在“格式 → 数据转换 → PYfNIRs 设置…”中重新选择。",
+             )
+ 
+     def show_environment_check(self) -> None:
+
+--- a/src/pyml_workbench/plugins.py
++++ b/src/pyml_workbench/plugins.py
+@@ -116,8 +116,26 @@
+ 
+ 
+ def detect_data_conversion(settings: PluginSettings) -> DetectedPlugin:
++    """Detect a generic data-conversion plugin without running its code."""
++    return _detect_data_conversion(settings)
++
++
++def detect_pyfnirs_data_conversion(settings: PluginSettings) -> DetectedPlugin:
++    """Detect only the PYfNIRs source-marked data-conversion release."""
++    return _detect_data_conversion(settings, required_source_project="PYfNIRs")
++
++
++def _detect_data_conversion(
++    settings: PluginSettings,
++    *,
++    required_source_project: str | None = None,
++) -> DetectedPlugin:
+     """Validate metadata and launch files only; no plugin code runs during detection."""
+     if not settings.directory:
++        if required_source_project == "PYfNIRs":
++            raise PluginError(
++                "未配置 PYfNIRs 专用插件目录，请在“格式 → 数据转换 → PYfNIRs 设置…”中选择目录。"
++            )
+         raise PluginError("未配置插件目录，请在“插件 → 设置”中选择目录。")
+     try:
+         directory = Path(settings.directory).expanduser().resolve()
+@@ -128,6 +146,11 @@
+                 or manifest["schema_version"] != 1
+                 or manifest.get("id") != "data-conversion"):
+             raise PluginError("未检测到兼容的数据转换插件。")
++        if (
++            required_source_project is not None
++            and manifest.get("source_project") != required_source_project
++        ):
++            raise PluginError(f"插件来源标识不匹配；需要 {required_source_project}。")
+         name, version = manifest.get("name"), manifest.get("version")
+         if not all(isinstance(item, str) and item.strip() for item in (name, version)):
+             raise PluginError("插件名称或版本缺失。")
+
+--- a/src/pyml_workbench/plugin_dialog.py
++++ b/src/pyml_workbench/plugin_dialog.py
+@@ -7,23 +7,31 @@
+ )
+ 
+ from .plugins import (
+-    PluginError, PluginSettings, PluginSettingsStore, detect_data_conversion,
++    PluginError,
++    PluginSettings,
++    PluginSettingsStore,
++    detect_data_conversion,
++    detect_pyfnirs_data_conversion,
+ )
+ 
+ 
+ class PluginSettingsDialog(QDialog):
+     def __init__(self, store: PluginSettingsStore, parent=None):
+         super().__init__(parent)
++        self.setObjectName("pluginSettingsDialog")
+         self.store = store
++        self._detector = detect_data_conversion
++        self._domain_name = "数据转换"
++        self._directory_dialog_title = "选择数据转换插件目录"
+         self.setWindowTitle("插件设置")
+         self.resize(640, 280)
+         layout = QVBoxLayout(self)
+-        explanation = QLabel(
++        self.explanation_label = QLabel(
+             "选择数据转换插件目录（其中应包含 pyml-plugin.json）。\n"
+             "检测通过后启用“数据转换”；首次配置前保持灰色。"
+         )
+-        explanation.setWordWrap(True)
+-        layout.addWidget(explanation)
++        self.explanation_label.setWordWrap(True)
++        layout.addWidget(self.explanation_label)
+         form = QFormLayout()
+         self.directory_edit = QLineEdit()
+         self.python_edit = QLineEdit()
+@@ -71,7 +79,7 @@
+ 
+     def choose_directory(self):
+         selected = QFileDialog.getExistingDirectory(
+-            self, "选择数据转换插件目录", self.directory_edit.text()
++            self, self._directory_dialog_title, self.directory_edit.text()
+         )
+         if selected:
+             self.directory_edit.setText(selected)
+@@ -86,9 +94,9 @@
+ 
+     def check_plugin(self):
+         try:
+-            plugin = detect_data_conversion(self.settings())
++            plugin = self._detector(self.settings())
+         except PluginError as exc:
+-            self.status_label.setText(f"数据转换不可用：{exc}")
++            self.status_label.setText(f"{self._domain_name}不可用：{exc}")
+             self.status_label.setStyleSheet("color: #6B7280;")
+         else:
+             self.status_label.setText(f"已检测到 {plugin.name} {plugin.version}，保存后启用入口。")
+@@ -101,3 +109,23 @@
+             QMessageBox.warning(self, "无法保存插件设置", str(exc))
+             return
+         self.accept()
++
++
++class PyfNIRsPluginSettingsDialog(PluginSettingsDialog):
++    """Settings page backed only by the dedicated PYfNIRs settings file."""
++
++    def __init__(self, store: PluginSettingsStore, parent=None):
++        super().__init__(store, parent)
++        self.setObjectName("pyfnirsPluginSettingsDialog")
++        self.setWindowTitle("PYfNIRs 转换器设置")
++        self._detector = detect_pyfnirs_data_conversion
++        self._domain_name = "PYfNIRs 转换器"
++        self._directory_dialog_title = "选择 PYfNIRs 专用发行目录"
++        self.explanation_label.setText(
++            "选择 PYfNIRs 专用发行目录（其中应包含来源标识为 PYfNIRs 的 pyml-plugin.json 和真实入口）。\n"
++            "本页使用独立设置文件，不会更改“插件”菜单中的通用数据转换配置。"
++        )
++        self.directory_edit.setPlaceholderText(
++            "例如：dist/PYfNIRs-DataConversion"
++        )
++        self.check_plugin()
+
+--- /dev/null
++++ b/tests/test_pyfnirs_plugin_integration.py
+@@ -0,0 +1,208 @@
++"""Source-aware PYfNIRs plugin detection and menu integration tests."""
++from __future__ import annotations
++
++import json
++import os
++from pathlib import Path
++import tempfile
++import unittest
++from unittest.mock import patch
++
++os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
++
++from pyml_workbench.gui import WorkbenchWindow
++from pyml_workbench.plugin_dialog import (
++    PluginSettingsDialog,
++    PyfNIRsPluginSettingsDialog,
++)
++from pyml_workbench.plugins import (
++    PluginError,
++    PluginSettings,
++    PluginSettingsStore,
++    detect_data_conversion,
++    detect_pyfnirs_data_conversion,
++)
++from PySide6.QtWidgets import QApplication
++
++
++def _write_plugin(
++    directory: Path,
++    *,
++    source_project: str | None = None,
++    include_source: bool = True,
++    entry_path: str = "PYfNIRs-DataConversion.exe",
++    create_entry: bool = True,
++) -> Path:
++    directory.mkdir(parents=True, exist_ok=True)
++    entry = directory / entry_path
++    if create_entry:
++        entry.parent.mkdir(parents=True, exist_ok=True)
++        entry.write_bytes(b"synthetic placeholder; detector must not execute it")
++    manifest = {
++        "schema_version": 1,
++        "id": "data-conversion",
++        "name": "Synthetic converter",
++        "version": "0.0-test",
++        "entrypoint": {"kind": "executable", "path": entry_path},
++    }
++    if include_source:
++        manifest["source_project"] = source_project
++    (directory / "pyml-plugin.json").write_text(
++        json.dumps(manifest, ensure_ascii=False), encoding="utf-8"
++    )
++    return entry
++
++
++class PluginDetectionTest(unittest.TestCase):
++    def setUp(self) -> None:
++        self.temporary = tempfile.TemporaryDirectory(prefix="pyfnirs-plugin-detect-")
++        self.root = Path(self.temporary.name)
++
++    def tearDown(self) -> None:
++        self.temporary.cleanup()
++
++    def test_dedicated_detector_requires_exact_source_and_existing_in_tree_entry(self) -> None:
++        legacy = self.root / "legacy"
++        _write_plugin(legacy, include_source=False)
++        with self.assertRaises(PluginError):
++            detect_pyfnirs_data_conversion(PluginSettings(str(legacy)))
++
++        wrong_source = self.root / "wrong-source"
++        _write_plugin(wrong_source, source_project="HyperEEG")
++        with self.assertRaises(PluginError):
++            detect_pyfnirs_data_conversion(PluginSettings(str(wrong_source)))
++
++        wrong_case = self.root / "wrong-case"
++        _write_plugin(wrong_case, source_project="pyfnirs")
++        with self.assertRaises(PluginError):
++            detect_pyfnirs_data_conversion(PluginSettings(str(wrong_case)))
++
++        missing_entry = self.root / "missing-entry"
++        _write_plugin(missing_entry, source_project="PYfNIRs", create_entry=False)
++        with self.assertRaises(PluginError):
++            detect_pyfnirs_data_conversion(PluginSettings(str(missing_entry)))
++
++        outside = self.root / "outside.exe"
++        outside.write_bytes(b"synthetic")
++        escaped_entry = self.root / "escaped-entry"
++        _write_plugin(
++            escaped_entry,
++            source_project="PYfNIRs",
++            entry_path="../outside.exe",
++            create_entry=False,
++        )
++        with self.assertRaises(PluginError):
++            detect_pyfnirs_data_conversion(PluginSettings(str(escaped_entry)))
++
++        valid = self.root / "valid"
++        valid_entry = _write_plugin(valid, source_project="PYfNIRs")
++        detected = detect_pyfnirs_data_conversion(PluginSettings(str(valid)))
++        self.assertEqual(Path(detected.program), valid_entry.resolve())
++        self.assertEqual(detected.arguments, ())
++
++    def test_generic_detector_keeps_accepting_legacy_hypereeg_manifest(self) -> None:
++        legacy = self.root / "legacy"
++        legacy_entry = _write_plugin(legacy, include_source=False)
++
++        detected = detect_data_conversion(PluginSettings(str(legacy)))
++
++        self.assertEqual(Path(detected.program), legacy_entry.resolve())
++        self.assertEqual(detected.arguments, ())
++
++
++class PluginMenuIntegrationTest(unittest.TestCase):
++    @classmethod
++    def setUpClass(cls) -> None:
++        cls.application = QApplication.instance() or QApplication(["pyfnirs-plugin-integration"])
++
++    def setUp(self) -> None:
++        self.temporary = tempfile.TemporaryDirectory(prefix="pyfnirs-plugin-menu-")
++        self.root = Path(self.temporary.name)
++        self.preferences_path = self.root / "preferences.json"
++        self.window = WorkbenchWindow(
++            preferences_path=self.preferences_path,
++            checkpoint_directory=self.root / "checkpoints",
++        )
++
++    def tearDown(self) -> None:
++        self.window.close()
++        self.application.processEvents()
++        self.temporary.cleanup()
++
++    def test_menu_uses_dedicated_store_and_tracks_validity_without_changing_legacy(self) -> None:
++        self.assertEqual(self.window.format_menu.title(), "格式")
++        self.assertEqual(self.window.data_conversion_menu.title(), "数据转换")
++        self.assertEqual(self.window.pyfnirs_conversion_action.text(), "PYfNIRs")
++        self.assertEqual(
++            self.window.plugin_settings_store.path,
++            self.preferences_path.with_name("plugins.json"),
++        )
++        dedicated_path = self.preferences_path.with_name("pyfnirs_plugins.json")
++        self.assertEqual(self.window.pyfnirs_plugin_settings_store.path, dedicated_path)
++        self.assertFalse(self.window.data_conversion_action.isEnabled())
++        self.assertFalse(self.window.pyfnirs_conversion_action.isEnabled())
++        self.assertIn("插件 → 设置", self.window.data_conversion_action.toolTip())
++        self.assertIn("PYfNIRs 设置", self.window.pyfnirs_conversion_action.toolTip())
++
++        legacy_dir = self.root / "legacy-hypereeg"
++        _write_plugin(legacy_dir, include_source=False)
++        self.window.plugin_settings_store.save(PluginSettings(str(legacy_dir)))
++        self.window.refresh_plugins()
++        self.assertTrue(self.window.data_conversion_action.isEnabled())
++        self.assertFalse(self.window.pyfnirs_conversion_action.isEnabled())
++
++        wrong_source_dir = self.root / "wrong-source"
++        _write_plugin(wrong_source_dir, source_project="HyperEEG")
++        self.window.pyfnirs_plugin_settings_store.save(
++            PluginSettings(str(wrong_source_dir), None)
++        )
++        with patch.object(
++            self.window.plugin_settings_store,
++            "load",
++            side_effect=AssertionError("PYfNIRs menu must not read generic plugin settings"),
++        ):
++            self.window.format_menu.aboutToShow.emit()
++        self.assertTrue(self.window.data_conversion_action.isEnabled())
++        self.assertFalse(self.window.pyfnirs_conversion_action.isEnabled())
++
++        valid_dir = self.root / "pyfnirs-release"
++        valid_entry = _write_plugin(valid_dir, source_project="PYfNIRs")
++        self.window.pyfnirs_plugin_settings_store.save(
++            PluginSettings(str(valid_dir), None)
++        )
++        self.window.format_menu.aboutToShow.emit()
++        self.assertTrue(self.window.data_conversion_action.isEnabled())
++        self.assertTrue(self.window.pyfnirs_conversion_action.isEnabled())
++
++        persisted = PluginSettingsStore(dedicated_path).load()
++        self.assertEqual(persisted.directory, str(valid_dir.resolve()))
++        self.assertIsNone(persisted.python_executable)
++        stored = json.loads(dedicated_path.read_text(encoding="utf-8"))
++        self.assertEqual(
++            set(stored), {"schema_version", "directory", "python_executable"}
++        )
++        self.assertEqual(valid_entry, valid_dir / "PYfNIRs-DataConversion.exe")
++
++        valid_entry.unlink()
++        self.window.format_menu.aboutToShow.emit()
++        self.assertTrue(self.window.data_conversion_action.isEnabled())
++        self.assertFalse(self.window.pyfnirs_conversion_action.isEnabled())
++
++    def test_settings_are_separate_chinese_pages(self) -> None:
++        generic_dialog = PluginSettingsDialog(self.window.plugin_settings_store, self.window)
++        pyfnirs_dialog = PyfNIRsPluginSettingsDialog(
++            self.window.pyfnirs_plugin_settings_store, self.window
++        )
++        try:
++            self.assertEqual(generic_dialog.windowTitle(), "插件设置")
++            self.assertEqual(pyfnirs_dialog.windowTitle(), "PYfNIRs 转换器设置")
++            self.assertIn("通用数据转换配置", pyfnirs_dialog.explanation_label.text())
++            self.assertIs(generic_dialog.store, self.window.plugin_settings_store)
++            self.assertIs(pyfnirs_dialog.store, self.window.pyfnirs_plugin_settings_store)
++        finally:
++            generic_dialog.close()
++            pyfnirs_dialog.close()
++
++
++if __name__ == "__main__":
++    unittest.main()

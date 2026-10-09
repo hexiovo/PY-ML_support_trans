@@ -1,0 +1,2041 @@
+{
+  "registryId": "pyfnirs-pyml-feature-capabilities",
+  "schemaVersion": 1,
+  "runId": "pyfnirs-pyml-converter-20261008-01",
+  "stage": "stage2-conditional-raw-subforms-production-validated",
+  "statusSemantics": {
+    "sourceCapabilityClass": {
+      "A": "上游已有固定科学输出；只描述源能力，不代表PY-ML转换器已验证。",
+      "B": "上游已有输出，但需要专门投影、汇总、轴/身份核验或适配。",
+      "C": "有计算函数返回值但无该函数固定自动MAT保存接口，需显式调用与导出。"
+    },
+    "converterActualStatus": {
+      "planned": "计划登记。",
+      "unverified": "该特征的具体子形态尚无完整验证；当前29项保持unverified，07/14/24仅登记有证据的conditionally_supported子形态。",
+      "supported": "身份、字段、维度、单位/参数及预期值已在转换路径实测。",
+      "conditionally_supported": "仅已验证的明确条件子形态可用。",
+      "rejected": "经核实不接入或当前契约明确拒绝。"
+    }
+  },
+  "sourceRoots": {
+    "sourceProject": "F:/Project/G-IBS/code/+PYfNIRs",
+    "supportProject": "F:/桌面/程序/PY-ML-support"
+  },
+  "sourcePlan": {
+    "path": "docs/PYfNIRs机器学习特征与数据组织方案_2026-10-08.txt",
+    "contractPrompt": "prompts/10-PYfNIRs-输入契约与32项适配.txt"
+  },
+  "inventory": {
+    "realMatInstanceInSourceProject": "not_found_at_plan_review",
+    "exportedResultsXlsxInSourceProject": "not_found_at_plan_review",
+    "consequence": "不得声称真实MAT数值已转换实测；results.xlsx是统计结果工作簿，不是逐样本study.Values。"
+  },
+  "conversionTarget": {
+    "currentPyMlNativeFormats": [
+      "CSV",
+      "XLSX",
+      "XLS"
+    ],
+    "nativeMatReadClaim": false,
+    "proposedMatInput": {
+      "file": "analysis_input.mat",
+      "topLevelVariable": "study",
+      "kind": "PYfNIRsDA.Study",
+      "schemaVersion": 1,
+      "valuesTable": "study.Values",
+      "valuesFields": [
+        "ObservationID",
+        "FeatureID",
+        "Value",
+        "IsValid",
+        "MissingReason",
+        "SourceID"
+      ],
+      "uniqueKey": [
+        "ObservationID",
+        "FeatureID"
+      ],
+      "featureDefinitions": "study.FeatureDefinitions",
+      "observationIdentity": "study.Observations",
+      "pairIdentity": "study.PairLinks",
+      "rule": "study.Values是目标长表，不证明32种源结构均可直接转换。"
+    },
+    "proposedOutput": {
+      "authoritative": "MLInput.mat: X, FeatureIDs, Samples, Targets, Covariates, FeatureDefinitions, ValidMask, MissingReasons, Provenance",
+      "reviewWorkbook": "MLInput.xlsx: FeatureMatrix, Samples, FeatureDictionary",
+      "implementationStatus": "PY-ML可读CSV bundle与XLSX转换已实现；当前仅有明确列出的raw Results条件子形态完整闭环证据。提议的MLInput.mat权威输出尚未实现；原生MAT读取仍需要MATLAB桥接。"
+    }
+  },
+  "commonRules": [
+    "以(ObservationID,FeatureID)唯一键组织值，不依赖MAT cell/struct顺序、XLSX行序或文件名推断身份。",
+    "记录键显式映射study.Observations；配对使用PairObservationID和study.PairLinks，保存双方记录、参与者和角色。",
+    "FeatureDefinitions保留指标、层级、Hb、节点/角色轴、频带、窗口、尺度、单位、变换、方向、维度及参数/映射指纹。",
+    "无效/缺失保留IsValid、MissingReason与mask；不补科学零值，也不静默删除观察或特征。",
+    "标签/协变量须显式联结并核对预测时点；标签不能泄漏进入X。",
+    "A/B/C为源能力类别，不是PY-ML转换器支持结论。"
+  ],
+  "stage2UpdateRule": "仅在实际MATLAB→桥接→PY-ML路径核对身份、字段、形状、单位/参数、有效mask及可复算预期值后更新具体子形态状态并记录证据；未测继续unverified。",
+  "features": [
+    {
+      "id": "01",
+      "name": "Hurst 指数 H",
+      "sourceCapabilityClass": "A",
+      "plannedStatus": "planned",
+      "converterActualStatus": "unverified",
+      "actualSupported": null,
+      "sourceContainerAndFields": [
+        "路径：R.data.all{1}.(Hb)，double 节点向量，通常 1×N。",
+        "来源：CHHurst / ROIHurst，独立文件通常为 *-Hurst.mat。"
+      ],
+      "payloadAndShapeEvidence": [
+        "路径：R.data.all{1}.(Hb)，double 节点向量，通常 1×N。"
+      ],
+      "sampleIdentity": {
+        "grain": "record",
+        "rule": "记录级；稳定RecordID/ObservationID映射study.Observations，节点另用固定标签映射。",
+        "source": "Results记录元数据/显式来源表，经记录键映射study.Observations",
+        "keys": [
+          "ObservationID",
+          "RecordID",
+          "SubjectID",
+          "Condition",
+          "Session",
+          "Timepoint"
+        ]
+      },
+      "hemoglobinRule": "仅使用负载实际保存的HbO/HbR/HbT；H与R²是不同分量。",
+      "unitEvidence": [
+        "方案未声明统一物理单位；须按源算法定义与FeatureDefinition核实，不推断。"
+      ],
+      "parametersAndSupport": [
+        "要求：一致的信号阶段、长度规则、采样率及算法设置。"
+      ],
+      "allowedProjection": [
+        "用法：每个 CH/ROI、每种实际 Hb 各一列，记录级特征。"
+      ],
+      "explicitRejectsOrDeferrals": [
+        "未由本项方案确认的投影暂缓；仍遵守全局身份、缺失和防泄漏规则。"
+      ],
+      "sourcePlanText": "01 Hurst 指数 H [A]\n路径：R.data.all{1}.(Hb)，double 节点向量，通常 1×N。\n来源：CHHurst / ROIHurst，独立文件通常为 *-Hurst.mat。\n用法：每个 CH/ROI、每种实际 Hb 各一列，记录级特征。\n要求：一致的信号阶段、长度规则、采样率及算法设置。",
+      "sourceEvidence": {
+        "sourcePlan": "docs/PYfNIRs机器学习特征与数据组织方案_2026-10-08.txt",
+        "planLineStart": 56,
+        "planLineEnd": 60,
+        "sourceCodeFiles": [
+          "toolbox/+PYfNIRs/CHHurst.m",
+          "toolbox/+PYfNIRs/ROIHurst.m"
+        ]
+      }
+    },
+    {
+      "id": "02",
+      "name": "Shannon 微分熵",
+      "sourceCapabilityClass": "A",
+      "plannedStatus": "planned",
+      "converterActualStatus": "unverified",
+      "actualSupported": null,
+      "sourceContainerAndFields": [
+        "路径：R.data.all.(Hb)，double，通常 1×N。",
+        "来源：CHSE / ROISE / SE_caculate。"
+      ],
+      "payloadAndShapeEvidence": [
+        "路径：R.data.all.(Hb)，double，通常 1×N。"
+      ],
+      "sampleIdentity": {
+        "grain": "record",
+        "rule": "记录级；稳定RecordID/ObservationID映射study.Observations，节点另用固定标签映射。",
+        "source": "Results记录元数据/显式来源表，经记录键映射study.Observations",
+        "keys": [
+          "ObservationID",
+          "RecordID",
+          "SubjectID",
+          "Condition",
+          "Session",
+          "Timepoint"
+        ]
+      },
+      "hemoglobinRule": "仅使用负载实际Hb字段；按源码为记录内标准化后KDE微分熵。",
+      "unitEvidence": [
+        "实际含义：信号先按本记录标准化，再用 KDE 估计的微分熵，log2，不能称为离散计数熵。"
+      ],
+      "parametersAndSupport": [
+        "转换前核对源参数/参数指纹、映射指纹及支持条件；无证据时维持unverified。"
+      ],
+      "allowedProjection": [
+        "用法：每节点/每 Hb 一列，保留 KDE/标准化版本。"
+      ],
+      "explicitRejectsOrDeferrals": [
+        "实际含义：信号先按本记录标准化，再用 KDE 估计的微分熵，log2，不能称为离散计数熵。"
+      ],
+      "sourcePlanText": "02 Shannon 微分熵 [A]\n路径：R.data.all.(Hb)，double，通常 1×N。\n来源：CHSE / ROISE / SE_caculate。\n实际含义：信号先按本记录标准化，再用 KDE 估计的微分熵，log2，不能称为离散计数熵。\n用法：每节点/每 Hb 一列，保留 KDE/标准化版本。",
+      "sourceEvidence": {
+        "sourcePlan": "docs/PYfNIRs机器学习特征与数据组织方案_2026-10-08.txt",
+        "planLineStart": 62,
+        "planLineEnd": 66,
+        "sourceCodeFiles": [
+          "toolbox/+PYfNIRs/SE_caculate.m",
+          "toolbox/+PYfNIRs/CHSE.m",
+          "toolbox/+PYfNIRs/ROISE.m"
+        ]
+      }
+    },
+    {
+      "id": "03",
+      "name": "归一化频谱熵",
+      "sourceCapabilityClass": "A",
+      "plannedStatus": "planned",
+      "converterActualStatus": "unverified",
+      "actualSupported": null,
+      "sourceContainerAndFields": [
+        "路径：R.data.all.(Hb)，double，通常 1×N。",
+        "来源：CHSpEn / ROISpEn / SpEn_caculate。"
+      ],
+      "payloadAndShapeEvidence": [
+        "路径：R.data.all.(Hb)，double，通常 1×N。"
+      ],
+      "sampleIdentity": {
+        "grain": "record",
+        "rule": "记录级；稳定RecordID/ObservationID映射study.Observations，节点另用固定标签映射。",
+        "source": "Results记录元数据/显式来源表，经记录键映射study.Observations",
+        "keys": [
+          "ObservationID",
+          "RecordID",
+          "SubjectID",
+          "Condition",
+          "Session",
+          "Timepoint"
+        ]
+      },
+      "hemoglobinRule": "仅使用实际Hb字段；源码为频谱熵，避免DA目录SPEN名称冲突。",
+      "unitEvidence": [
+        "实际含义：Welch 功率谱归一化后计算 Shannon 熵，再除以 log2(频点数)。"
+      ],
+      "parametersAndSupport": [
+        "转换前核对源参数/参数指纹、映射指纹及支持条件；无证据时维持unverified。"
+      ],
+      "allowedProjection": [
+        "用法：每节点/每 Hb 一列，频率支持和 Welch 设置一致。"
+      ],
+      "explicitRejectsOrDeferrals": [
+        "这是 SpEn Pipeline 的实际实现；不能因为某个目录描述写了 sample entropy 就当作样本熵。"
+      ],
+      "sourcePlanText": "03 归一化频谱熵 [A]\n路径：R.data.all.(Hb)，double，通常 1×N。\n来源：CHSpEn / ROISpEn / SpEn_caculate。\n实际含义：Welch 功率谱归一化后计算 Shannon 熵，再除以 log2(频点数)。\n这是 SpEn Pipeline 的实际实现；不能因为某个目录描述写了 sample entropy 就当作样本熵。\n用法：每节点/每 Hb 一列，频率支持和 Welch 设置一致。",
+      "sourceEvidence": {
+        "sourcePlan": "docs/PYfNIRs机器学习特征与数据组织方案_2026-10-08.txt",
+        "planLineStart": 68,
+        "planLineEnd": 73,
+        "sourceCodeFiles": [
+          "toolbox/+PYfNIRs/SpEn_caculate.m",
+          "toolbox/+PYfNIRs/CHSpEn.m",
+          "toolbox/+PYfNIRs/ROISpEn.m",
+          "toolbox/+PYfNIRs-DA/matlab/+PYfNIRsDA/+features/adapterCatalog.m",
+          "toolbox/+PYfNIRs-DA/matlab/+PYfNIRsDA/+features/adaptResult.m"
+        ]
+      },
+      "sourceSemantic": "SpEn_caculate按Welch功率谱概率分布计算归一化Shannon频谱熵；不是单尺度/多尺度样本熵。",
+      "knownSemanticConflict": "DA adapterCatalog将SPEN描述为Node sample entropy，而adaptResult把SE和SPEN映射到同一R.data.all.(Hb)负载；转换不得仅凭SPEN名称判语义。"
+    },
+    {
+      "id": "04",
+      "name": "多尺度样本熵与复杂度指数",
+      "sourceCapabilityClass": "A",
+      "plannedStatus": "planned",
+      "converterActualStatus": "unverified",
+      "actualSupported": null,
+      "sourceContainerAndFields": [
+        "路径：R.data.all.(Hb){n}，cell 每节点一个 struct。",
+        "尺度向量：.ScaleFactors，double，1×S；样本熵：.SampEn，double，1×S。",
+        "复杂度：.ComplexityIndex，double 标量。",
+        "来源：calculateMultiscaleEntropyFolder，文件 *-MSE.mat。"
+      ],
+      "payloadAndShapeEvidence": [
+        "路径：R.data.all.(Hb){n}，cell 每节点一个 struct。",
+        "尺度向量：.ScaleFactors，double，1×S；样本熵：.SampEn，double，1×S。",
+        "复杂度：.ComplexityIndex，double 标量。"
+      ],
+      "sampleIdentity": {
+        "grain": "record",
+        "rule": "记录级；稳定RecordID/ObservationID映射study.Observations，节点另用固定标签映射。",
+        "source": "Results记录元数据/显式来源表，经记录键映射study.Observations",
+        "keys": [
+          "ObservationID",
+          "RecordID",
+          "SubjectID",
+          "Condition",
+          "Session",
+          "Timepoint"
+        ]
+      },
+      "hemoglobinRule": "当前folder exporter保存HbO/HbR；不假设HbT。",
+      "unitEvidence": [
+        "尺度时间：.ScaleDurationsSeconds；实际参与复杂度的尺度集合：.ComplexityIndexScaleFactors。",
+        "要求：所选尺度有效，采样率/实际尺度秒数可比；复杂度若使用的有效尺度集合不同，不可直接当作同一特征。"
+      ],
+      "parametersAndSupport": [
+        "要求：所选尺度有效，采样率/实际尺度秒数可比；复杂度若使用的有效尺度集合不同，不可直接当作同一特征。"
+      ],
+      "allowedProjection": [
+        "用法：固定节点/Hb/尺度的 SampEn 各一列；或固定尺度集合的 ComplexityIndex 各一列。"
+      ],
+      "explicitRejectsOrDeferrals": [
+        "要求：所选尺度有效，采样率/实际尺度秒数可比；复杂度若使用的有效尺度集合不同，不可直接当作同一特征。"
+      ],
+      "sourcePlanText": "04 多尺度样本熵与复杂度指数 [A]\n路径：R.data.all.(Hb){n}，cell 每节点一个 struct。\n尺度向量：.ScaleFactors，double，1×S；样本熵：.SampEn，double，1×S。\n复杂度：.ComplexityIndex，double 标量。\n尺度时间：.ScaleDurationsSeconds；实际参与复杂度的尺度集合：.ComplexityIndexScaleFactors。\n来源：calculateMultiscaleEntropyFolder，文件 *-MSE.mat。\n用法：固定节点/Hb/尺度的 SampEn 各一列；或固定尺度集合的 ComplexityIndex 各一列。\n要求：所选尺度有效，采样率/实际尺度秒数可比；复杂度若使用的有效尺度集合不同，不可直接当作同一特征。",
+      "sourceEvidence": {
+        "sourcePlan": "docs/PYfNIRs机器学习特征与数据组织方案_2026-10-08.txt",
+        "planLineStart": 75,
+        "planLineEnd": 82,
+        "sourceCodeFiles": [
+          "toolbox/+PYfNIRs/calculateMultiscaleEntropy.m",
+          "toolbox/+PYfNIRs/calculateMultiscaleEntropyFolder.m"
+        ]
+      }
+    },
+    {
+      "id": "05",
+      "name": "RQA 有效递归结构量",
+      "sourceCapabilityClass": "A",
+      "plannedStatus": "planned",
+      "converterActualStatus": "unverified",
+      "actualSupported": null,
+      "sourceContainerAndFields": [
+        "路径：R.data.all.(Hb){n}.(Metric)，cell→struct→double 标量。"
+      ],
+      "payloadAndShapeEvidence": [
+        "路径：R.data.all.(Hb){n}.(Metric)，cell→struct→double 标量。"
+      ],
+      "sampleIdentity": {
+        "grain": "record",
+        "rule": "记录级；稳定RecordID/ObservationID映射study.Observations，节点另用固定标签映射。",
+        "source": "Results记录元数据/显式来源表，经记录键映射study.Observations",
+        "keys": [
+          "ObservationID",
+          "RecordID",
+          "SubjectID",
+          "Condition",
+          "Session",
+          "Timepoint"
+        ]
+      },
+      "hemoglobinRule": "按实际保存Hb字段；节点/通道映射需核对。",
+      "unitEvidence": [
+        "用法：节点×Hb×指标展开。线长指标按当前采样/嵌入步长的点数解释，不能未经换算称为秒。"
+      ],
+      "parametersAndSupport": [
+        "要求：一致的嵌入/阈值选择规则；训练折内去常量，并保留缺失而非零填充。"
+      ],
+      "allowedProjection": [
+        "用法：节点×Hb×指标展开。线长指标按当前采样/嵌入步长的点数解释，不能未经换算称为秒。"
+      ],
+      "explicitRejectsOrDeferrals": [
+        "用法：节点×Hb×指标展开。线长指标按当前采样/嵌入步长的点数解释，不能未经换算称为秒。"
+      ],
+      "sourcePlanText": "05 RQA 有效递归结构量 [A]\n路径：R.data.all.(Hb){n}.(Metric)，cell→struct→double 标量。\n候选：RR、DET、Lmax、Lmean、ENT、LAM、TT、Vmax。\n用法：节点×Hb×指标展开。线长指标按当前采样/嵌入步长的点数解释，不能未经换算称为秒。\n要求：一致的嵌入/阈值选择规则；训练折内去常量，并保留缺失而非零填充。",
+      "sourceEvidence": {
+        "sourcePlan": "docs/PYfNIRs机器学习特征与数据组织方案_2026-10-08.txt",
+        "planLineStart": 84,
+        "planLineEnd": 88,
+        "sourceCodeFiles": [
+          "toolbox/+PYfNIRs/RQA_caculate.m",
+          "toolbox/+PYfNIRs/computeCRQA.m",
+          "toolbox/+PYfNIRs/CHRQA.m",
+          "toolbox/+PYfNIRs/ROIRQA.m"
+        ]
+      }
+    },
+    {
+      "id": "06",
+      "name": "HbO-HbR 相位差编码",
+      "sourceCapabilityClass": "B",
+      "plannedStatus": "planned",
+      "converterActualStatus": "unverified",
+      "actualSupported": null,
+      "sourceContainerAndFields": [
+        "全段路径：R.data.all.HbO，double，通常 1×N。",
+        "窗口路径：R.data.all{w}.HbO，cell 每窗口一个节点向量。",
+        "来源：CHHpod / ROIHpod，文件 *-Hpod.mat。"
+      ],
+      "payloadAndShapeEvidence": [
+        "全段路径：R.data.all.HbO，double，通常 1×N。",
+        "窗口路径：R.data.all{w}.HbO，cell 每窗口一个节点向量。",
+        "窗口起点当前文件可能需要由显式窗长、步长和已验证采样率恢复，并记录其来源；仅凭 cell 序号不能猜测实际时间。"
+      ],
+      "sampleIdentity": {
+        "grain": "record",
+        "rule": "记录级；稳定RecordID/ObservationID映射study.Observations，节点另用固定标签映射。",
+        "source": "Results记录元数据/显式来源表，经记录键映射study.Observations",
+        "keys": [
+          "ObservationID",
+          "RecordID",
+          "SubjectID",
+          "Condition",
+          "Session",
+          "Timepoint"
+        ]
+      },
+      "hemoglobinRule": "输出字段HbO承载HbO-HbR相位差，不能解释为单独HbO浓度。",
+      "unitEvidence": [
+        "原值 θ 是弧度相位差，来自 angle(mean(exp(i*(phaseHbO-phaseHbR))))。"
+      ],
+      "parametersAndSupport": [
+        "转换前核对源参数/参数指纹、映射指纹及支持条件；无证据时维持unverified。"
+      ],
+      "allowedProjection": [
+        "ML 列：sin(θ)、cos(θ)。全段已有 θ，编码为新增整理步骤。"
+      ],
+      "explicitRejectsOrDeferrals": [
+        "窗口汇总：先规定窗口范围，再计算平均 sin(θ)、平均 cos(θ)，也可由二者求圆均值；不能直接对跨 ±π 的角度做算术均值。",
+        "当前 DA 的 HPOD 窗口汇总是算术 mean，不具备本方案的圆统计处理。跨窗口圆统计需补提取步骤，不能视为现成能力。",
+        "窗口起点当前文件可能需要由显式窗长、步长和已验证采样率恢复，并记录其来源；仅凭 cell 序号不能猜测实际时间。"
+      ],
+      "sourcePlanText": "06 HbO-HbR 相位差编码 [B]\n全段路径：R.data.all.HbO，double，通常 1×N。\n窗口路径：R.data.all{w}.HbO，cell 每窗口一个节点向量。\n来源：CHHpod / ROIHpod，文件 *-Hpod.mat。\n原值 θ 是弧度相位差，来自 angle(mean(exp(i*(phaseHbO-phaseHbR))))。\nML 列：sin(θ)、cos(θ)。全段已有 θ，编码为新增整理步骤。\n窗口汇总：先规定窗口范围，再计算平均 sin(θ)、平均 cos(θ)，也可由二者求圆均值；不能直接对跨 ±π 的角度做算术均值。\n当前 DA 的 HPOD 窗口汇总是算术 mean，不具备本方案的圆统计处理。跨窗口圆统计需补提取步骤，不能视为现成能力。\n窗口起点当前文件可能需要由显式窗长、步长和已验证采样率恢复，并记录其来源；仅凭 cell 序号不能猜测实际时间。\n",
+      "sourceEvidence": {
+        "sourcePlan": "docs/PYfNIRs机器学习特征与数据组织方案_2026-10-08.txt",
+        "planLineStart": 90,
+        "planLineEnd": 98,
+        "sourceCodeFiles": [
+          "toolbox/+PYfNIRs/Hpodcaculate.m",
+          "toolbox/+PYfNIRs/CHHpod.m",
+          "toolbox/+PYfNIRs/ROIHpod.m"
+        ]
+      }
+    },
+    {
+      "id": "07",
+      "name": "静态 FC 边",
+      "sourceCapabilityClass": "A",
+      "plannedStatus": "planned",
+      "converterActualStatus": "conditionally_supported",
+      "actualSupported": true,
+      "sourceContainerAndFields": [
+        "路径：R.data.all.(Hb)，double，N×N。",
+        "来源：StaticFC / FC_pipeline，文件 *-FC.mat。"
+      ],
+      "payloadAndShapeEvidence": [
+        "路径：R.data.all.(Hb)，double，N×N。",
+        "用法：只取无向矩阵严格上三角 i<j，节点标签顺序固定，每 Hb 为 N(N-1)/2 列。",
+        "WTC 这里是现有实现的全矩阵平均相干标量，不能标成某个指定频带的 WTC。"
+      ],
+      "sampleIdentity": {
+        "grain": "record",
+        "rule": "记录级；稳定RecordID/ObservationID映射study.Observations，节点另用固定标签映射。",
+        "source": "Results记录元数据/显式来源表，经记录键映射study.Observations",
+        "keys": [
+          "ObservationID",
+          "RecordID",
+          "SubjectID",
+          "Condition",
+          "Session",
+          "Timepoint"
+        ]
+      },
+      "hemoglobinRule": "按实际矩阵Hb字段；模型定义也需记录。",
+      "unitEvidence": [
+        "方案未声明统一物理单位；须按源算法定义与FeatureDefinition核实，不推断。"
+      ],
+      "parametersAndSupport": [
+        "转换前核对源参数/参数指纹、映射指纹及支持条件；无证据时维持unverified。"
+      ],
+      "allowedProjection": [
+        "用法：只取无向矩阵严格上三角 i<j，节点标签顺序固定，每 Hb 为 N(N-1)/2 列。"
+      ],
+      "explicitRejectsOrDeferrals": [
+        "WTC 这里是现有实现的全矩阵平均相干标量，不能标成某个指定频带的 WTC。",
+        "Xcorr 当前是最大绝对互相关强度；静态 FC 输出没有独立 lag 字段，不能虚构。"
+      ],
+      "sourcePlanText": "07 静态 FC 边 [A]\n路径：R.data.all.(Hb)，double，N×N。\n来源：StaticFC / FC_pipeline，文件 *-FC.mat。\n已有模型编号：1 Pearson，2 SI，3 WTC，4 MI_KDE，5 Xcorr，6 PLI，7 wPLI，8 Spearman，9 Biweight。\n用法：只取无向矩阵严格上三角 i<j，节点标签顺序固定，每 Hb 为 N(N-1)/2 列。\n不同模型作为不同列定义；SI 与 PLV 在相同处理条件下若重复，只保留一套。\nWTC 这里是现有实现的全矩阵平均相干标量，不能标成某个指定频带的 WTC。\nPearson 可选 Fisher z，必须确认源值是 raw r 且 |r|<1；其他模型按原指标含义处理，不套用 Pearson 变换。\nMI_KDE 保留当前估计方法标识，只有有限、定义一致、长度条件可比时使用；不声称等同另一种互信息估计器。\nXcorr 当前是最大绝对互相关强度；静态 FC 输出没有独立 lag 字段，不能虚构。",
+      "sourceEvidence": {
+        "sourcePlan": "docs/PYfNIRs机器学习特征与数据组织方案_2026-10-08.txt",
+        "planLineStart": 102,
+        "planLineEnd": 111,
+        "sourceCodeFiles": [
+          "toolbox/+PYfNIRs/StaticFC.m",
+          "toolbox/+PYfNIRs/FC_pipeline.m"
+        ]
+      },
+      "actualSupportCondition": "Static FC only: Results.Metadata.FC.Kind=static, ModelIndex=1 (Pearson), nonempty ParameterFingerprint, unique explicit NodeOrder, symmetric numeric N×N matrix matching NodeOrder; select distinct node_a/node_b with i<j. Verified exemplar: 2×2 ROI-A/ROI-B, HbO=0.25; no evidence for other FC models, WTC bands, MI, or lag features.",
+      "actualEvidence": {
+        "matlabFixture": "F:\\桌面\\程序\\PY-ML-support\\tests\\pyfnirs\\fixtures\\raw_results_synthetic_v3\\raw_results_synthetic.mat",
+        "matlabFixtureSha256": "540496de6ffdfb7e1b69839fdffc2a5cefbf74d936af3f9546eae03cf012812d",
+        "helperExport": "F:\\桌面\\程序\\PY-ML-support\\tests\\pyfnirs\\fixtures\\raw_results_synthetic_v3\\raw_results_synthetic.json",
+        "helperExportSha256": "d5860a193a26e3dfd729f31cf4f2edfe5ce0a93c25c170a827eff1e0416d2c8e",
+        "independentExpected": "F:\\桌面\\程序\\PY-ML-support\\tests\\pyfnirs\\fixtures\\raw_results_synthetic_v3\\expected.json",
+        "independentExpectedSha256": "15c790e8aac9d6429ff3f1312e734d4d8c107ab59e97d3ac64f9accc65a8d104",
+        "matlabRelease": "2023a",
+        "matlabVersion": "9.14.0.2206163 (R2023a)",
+        "adapterId": "pyfnirs.raw_results.v1",
+        "memoryPatchClosure": "PASS",
+        "memoryPatchOutputs": {
+          "csvFeatureMatrixSha256": "c21d5c3d451067b076a0a701294ff78256ee18d6a1e3ed28afe641f6a2b1aac9",
+          "xlsxSha256": "616ae448d421b8b14517a664b2cea52b7f713ccaed039147d729eb9c7c65b06c"
+        },
+        "productionRegistryRerun": "PASS; actual MATLAB-v7.3 MAT→raw bridge→core→CSV/XLSX, no registry patch",
+        "productionClosure": {
+          "result": "PASS; fresh Python process; production registry loaded from disk; no registry monkeypatch",
+          "evidenceReport": "H:\\AIcode\\HexiPlan\\runs\\pyfnirs-pyml-converter-20261008-01\\evidence\\raw-feature-production-closure-r1.json",
+          "evidenceReportSha256": "9b22dc32ae80c558f3ff6394c1c60884aa078a08796408ff361becbb71b82a06",
+          "sourceMat": "F:\\桌面\\程序\\PY-ML-support\\tests\\pyfnirs\\fixtures\\raw_results_synthetic_v3\\raw_results_synthetic.mat",
+          "sourceMatSha256": "540496de6ffdfb7e1b69839fdffc2a5cefbf74d936af3f9546eae03cf012812d",
+          "matlabRelease": "2023a",
+          "matlabVersion": "9.14.0.2206163 (R2023a)",
+          "bridgeAdapterId": "pyfnirs.raw_results.v1",
+          "bridgeHelperSha256": "36955bd9fd2b8dceaae087b53628c6ad227f56281365a672e1defe4894bd8ac1",
+          "bridgeDocumentSha256": "b4bf2a4175e679ffb6d11081e30a3d5a4aeeade35a42d1d23777040e6ea5b5e4",
+          "independentExpectedSha256": "15c790e8aac9d6429ff3f1312e734d4d8c107ab59e97d3ac64f9accc65a8d104",
+          "featureIds": [
+            "PH-HBO-H0-PERSISTENCE",
+            "FC-HBO-ROI-A-ROI-B",
+            "MVAR-HBO-ROI-A-TO-ROI-B",
+            "PH-HBR-H1-PERSISTENCE-MISSING"
+          ],
+          "values": [
+            2.5,
+            0.25,
+            0.3,
+            null
+          ],
+          "validMask": [
+            true,
+            true,
+            true,
+            false
+          ],
+          "missingReasons": [
+            "",
+            "",
+            "",
+            "source_nonfinite"
+          ],
+          "identities": {
+            "Group": "synthetic_case",
+            "ObservationID": "OBS-SYN-17",
+            "RecordID": "REC-SYN-17",
+            "SubjectID": "SUB-SYN-9"
+          },
+          "sourceParameters": {
+            "Results.Metadata.FC.Kind": "static",
+            "Results.Metadata.FC.ModelIndex": 1.0,
+            "Results.Metadata.FC.ParameterFingerprint": "SYNTHETIC-PEARSON-v1",
+            "Results.Metadata.MVARGranger.DirectionConvention": "row_source_column_target",
+            "Results.Metadata.MVARGranger.FormulaVersion": "conditional_log_residual_variance_ratio_v1",
+            "Results.Metadata.MVARGranger.Options.Order": 2.0,
+            "Results.Metadata.MVARGranger.Options.Window.Enabled": false,
+            "Results.Metadata.MVARGranger.SamplingRate": 10.0,
+            "Results.Metadata.PersistentHomology.DistanceFormula": "one_minus_similarity_v1",
+            "Results.Metadata.PersistentHomology.Options.InputSemantics": "positive_similarity",
+            "Results.Metadata.PersistentHomology.Options.Threshold": 0.5
+          },
+          "csvOutputs": {
+            "FeatureDictionary.csv": {
+              "path": "H:\\AIcode\\HexiPlan\\runs\\pyfnirs-pyml-converter-20261008-01\\tmp\\raw_feature_closure_production_r1_csv\\FeatureDictionary.csv",
+              "sha256": "137228ee28f09070566fb44e0f9571529e21f42f054e5d35e2a820afc15fc9b1"
+            },
+            "FeatureMatrix.csv": {
+              "path": "H:\\AIcode\\HexiPlan\\runs\\pyfnirs-pyml-converter-20261008-01\\tmp\\raw_feature_closure_production_r1_csv\\FeatureMatrix.csv",
+              "sha256": "c21d5c3d451067b076a0a701294ff78256ee18d6a1e3ed28afe641f6a2b1aac9"
+            },
+            "Provenance.json": {
+              "path": "H:\\AIcode\\HexiPlan\\runs\\pyfnirs-pyml-converter-20261008-01\\tmp\\raw_feature_closure_production_r1_csv\\Provenance.json",
+              "sha256": "d5da1f3eb58c5d65cab33179804705f4226fd33fa55db0b9dca4d41a4783d023"
+            },
+            "Samples.csv": {
+              "path": "H:\\AIcode\\HexiPlan\\runs\\pyfnirs-pyml-converter-20261008-01\\tmp\\raw_feature_closure_production_r1_csv\\Samples.csv",
+              "sha256": "10a6c5bc8dfdd9003b0999aa9c260beb5f8a9d772aa120b18ad60ab6093fa53c"
+            }
+          },
+          "xlsxOutput": {
+            "path": "H:\\AIcode\\HexiPlan\\runs\\pyfnirs-pyml-converter-20261008-01\\tmp\\raw_feature_closure_production_r1.xlsx",
+            "sha256": "1cd0d806e866ca69b6df8fc21e0a84ea729c743077f6119775d47f9cdc937c47"
+          }
+        }
+      }
+    },
+    {
+      "id": "08",
+      "name": "动态 FC 窗口均值",
+      "sourceCapabilityClass": "A/B",
+      "plannedStatus": "planned",
+      "converterActualStatus": "unverified",
+      "actualSupported": null,
+      "sourceContainerAndFields": [
+        "路径：R.data.all{w}.(Hb)，cell，W 份 N×N double 矩阵。",
+        "时间元数据：R.Metadata.FC.WindowStartSeconds / WindowLengthSeconds / WindowStepSeconds。"
+      ],
+      "payloadAndShapeEvidence": [
+        "路径：R.data.all{w}.(Hb)，cell，W 份 N×N double 矩阵。"
+      ],
+      "sampleIdentity": {
+        "grain": "record",
+        "rule": "记录级；稳定RecordID/ObservationID映射study.Observations，节点另用固定标签映射。",
+        "source": "Results记录元数据/显式来源表，经记录键映射study.Observations",
+        "keys": [
+          "ObservationID",
+          "RecordID",
+          "SubjectID",
+          "Condition",
+          "Session",
+          "Timepoint"
+        ]
+      },
+      "hemoglobinRule": "按实际窗口矩阵Hb字段。",
+      "unitEvidence": [
+        "时间元数据：R.Metadata.FC.WindowStartSeconds / WindowLengthSeconds / WindowStepSeconds。"
+      ],
+      "parametersAndSupport": [
+        "转换前核对源参数/参数指纹、映射指纹及支持条件；无证据时维持unverified。"
+      ],
+      "allowedProjection": [
+        "用法：预定义区间内逐边 mean；当前 DA 支持 equal_windows 均值及最低覆盖检查。"
+      ],
+      "explicitRejectsOrDeferrals": [
+        "窗口不能在记录级预测中被随意当作独立样本；按被试/配对分组后才允许形成窗口级训练单元。"
+      ],
+      "sourcePlanText": "08 动态 FC 窗口均值 [A]，其他动态摘要 [B]\n路径：R.data.all{w}.(Hb)，cell，W 份 N×N double 矩阵。\n时间元数据：R.Metadata.FC.WindowStartSeconds / WindowLengthSeconds / WindowStepSeconds。\n用法：预定义区间内逐边 mean；当前 DA 支持 equal_windows 均值及最低覆盖检查。\n可扩展：逐边 Std、Median 或其它预登记摘要；这些是对现有窗口输出的新整理，不是现有 DA 提取结果。\n也可保留 W×边的固定时序用于序列模型 [B]，需一致窗长、步长和时间支持。\n窗口不能在记录级预测中被随意当作独立样本；按被试/配对分组后才允许形成窗口级训练单元。",
+      "sourceEvidence": {
+        "sourcePlan": "docs/PYfNIRs机器学习特征与数据组织方案_2026-10-08.txt",
+        "planLineStart": 113,
+        "planLineEnd": 119,
+        "sourceCodeFiles": [
+          "toolbox/+PYfNIRs/DynamicFC.m",
+          "toolbox/+PYfNIRs-DA/matlab/+PYfNIRsDA/+features/adaptResult.m"
+        ]
+      }
+    },
+    {
+      "id": "09",
+      "name": "PLV 边",
+      "sourceCapabilityClass": "A",
+      "plannedStatus": "planned",
+      "converterActualStatus": "unverified",
+      "actualSupported": null,
+      "sourceContainerAndFields": [
+        "路径：R.data.all.(Hb)，double，N×N。",
+        "来源：CHPLV / ROIPLV。"
+      ],
+      "payloadAndShapeEvidence": [
+        "路径：R.data.all.(Hb)，double，N×N。"
+      ],
+      "sampleIdentity": {
+        "grain": "record",
+        "rule": "记录级；稳定RecordID/ObservationID映射study.Observations，节点另用固定标签映射。",
+        "source": "Results记录元数据/显式来源表，经记录键映射study.Observations",
+        "keys": [
+          "ObservationID",
+          "RecordID",
+          "SubjectID",
+          "Condition",
+          "Session",
+          "Timepoint"
+        ]
+      },
+      "hemoglobinRule": "按实际PLV矩阵Hb字段。",
+      "unitEvidence": [
+        "方案未声明统一物理单位；须按源算法定义与FeatureDefinition核实，不推断。"
+      ],
+      "parametersAndSupport": [
+        "转换前核对源参数/参数指纹、映射指纹及支持条件；无证据时维持unverified。"
+      ],
+      "allowedProjection": [
+        "用法：严格上三角，每边一列，取值范围 0–1，参数/信号阶段一致。"
+      ],
+      "explicitRejectsOrDeferrals": [
+        "未由本项方案确认的投影暂缓；仍遵守全局身份、缺失和防泄漏规则。"
+      ],
+      "sourcePlanText": "09 PLV 边 [A]\n路径：R.data.all.(Hb)，double，N×N。\n来源：CHPLV / ROIPLV。\n用法：严格上三角，每边一列，取值范围 0–1，参数/信号阶段一致。",
+      "sourceEvidence": {
+        "sourcePlan": "docs/PYfNIRs机器学习特征与数据组织方案_2026-10-08.txt",
+        "planLineStart": 121,
+        "planLineEnd": 124,
+        "sourceCodeFiles": [
+          "toolbox/+PYfNIRs/CHPLV.m",
+          "toolbox/+PYfNIRs/ROIPLV.m"
+        ]
+      }
+    },
+    {
+      "id": "10",
+      "name": "频带相干性",
+      "sourceCapabilityClass": "A",
+      "plannedStatus": "planned",
+      "converterActualStatus": "unverified",
+      "actualSupported": null,
+      "sourceContainerAndFields": [
+        "路径：R.data.all.(Hb){i,j}，N×N cell，每格 F×1 double 相干谱。",
+        "频率：R.frequency，F×1 double。",
+        "来源：CHCoherence / ROICoherence。"
+      ],
+      "payloadAndShapeEvidence": [
+        "路径：R.data.all.(Hb){i,j}，N×N cell，每格 F×1 double 相干谱。",
+        "频率：R.frequency，F×1 double。"
+      ],
+      "sampleIdentity": {
+        "grain": "record",
+        "rule": "记录级；稳定RecordID/ObservationID映射study.Observations，节点另用固定标签映射。",
+        "source": "Results记录元数据/显式来源表，经记录键映射study.Observations",
+        "keys": [
+          "ObservationID",
+          "RecordID",
+          "SubjectID",
+          "Condition",
+          "Session",
+          "Timepoint"
+        ]
+      },
+      "hemoglobinRule": "按谱实际存在的Hb字段。",
+      "unitEvidence": [
+        "方案未声明统一物理单位；须按源算法定义与FeatureDefinition核实，不推断。"
+      ],
+      "parametersAndSupport": [
+        "转换前核对源参数/参数指纹、映射指纹及支持条件；无证据时维持unverified。"
+      ],
+      "allowedProjection": [
+        "用法：事先指定频带 [f_low,f_high]，逐边取频带 mean，严格上三角。"
+      ],
+      "explicitRejectsOrDeferrals": [
+        "未由本项方案确认的投影暂缓；仍遵守全局身份、缺失和防泄漏规则。"
+      ],
+      "sourcePlanText": "10 频带相干性 [A：汇总后]\n路径：R.data.all.(Hb){i,j}，N×N cell，每格 F×1 double 相干谱。\n频率：R.frequency，F×1 double。\n来源：CHCoherence / ROICoherence。\n用法：事先指定频带 [f_low,f_high]，逐边取频带 mean，严格上三角。\n原频谱也可在同一固定频率网格下用于专门模型 [B]；当前 DA 输入是频段汇总值。",
+      "sourceEvidence": {
+        "sourcePlan": "docs/PYfNIRs机器学习特征与数据组织方案_2026-10-08.txt",
+        "planLineStart": 126,
+        "planLineEnd": 131,
+        "sourceCodeFiles": [
+          "toolbox/+PYfNIRs/CHCoherence.m",
+          "toolbox/+PYfNIRs/ROICoherence.m"
+        ]
+      }
+    },
+    {
+      "id": "11",
+      "name": "OD 频带功率",
+      "sourceCapabilityClass": "A",
+      "plannedStatus": "planned",
+      "converterActualStatus": "unverified",
+      "actualSupported": null,
+      "sourceContainerAndFields": [
+        "路径：R.data.all{n}，节点 cell，每项 F×1 double。",
+        "频率：R.frequencies，F×1 double。",
+        "来源：Welch_pre / PSD_pipeline 的谱计算阶段。"
+      ],
+      "payloadAndShapeEvidence": [
+        "路径：R.data.all{n}，节点 cell，每项 F×1 double。",
+        "频率：R.frequencies，F×1 double。"
+      ],
+      "sampleIdentity": {
+        "grain": "record",
+        "rule": "记录级；稳定RecordID/ObservationID映射study.Observations，节点另用固定标签映射。",
+        "source": "Results记录元数据/显式来源表，经记录键映射study.Observations",
+        "keys": [
+          "ObservationID",
+          "RecordID",
+          "SubjectID",
+          "Condition",
+          "Session",
+          "Timepoint"
+        ]
+      },
+      "hemoglobinRule": "无Hb分量：双波长OD Welch PSD平均。",
+      "unitEvidence": [
+        "实际信号：两个波长的 OD Welch 功率平均，单位为 OD²/Hz，不含 HbO/HbR/HbT 分量。",
+        "用法：同一频带 trapezoidal integral，单位 OD²；或 mean PSD，单位 OD²/Hz。应分别定义，不能混为一列。"
+      ],
+      "parametersAndSupport": [
+        "转换前核对源参数/参数指纹、映射指纹及支持条件；无证据时维持unverified。"
+      ],
+      "allowedProjection": [
+        "用法：同一频带 trapezoidal integral，单位 OD²；或 mean PSD，单位 OD²/Hz。应分别定义，不能混为一列。"
+      ],
+      "explicitRejectsOrDeferrals": [
+        "用法：同一频带 trapezoidal integral，单位 OD²；或 mean PSD，单位 OD²/Hz。应分别定义，不能混为一列。"
+      ],
+      "sourcePlanText": "11 OD 频带功率 [A：汇总后]\n路径：R.data.all{n}，节点 cell，每项 F×1 double。\n频率：R.frequencies，F×1 double。\n来源：Welch_pre / PSD_pipeline 的谱计算阶段。\n实际信号：两个波长的 OD Welch 功率平均，单位为 OD²/Hz，不含 HbO/HbR/HbT 分量。\n用法：同一频带 trapezoidal integral，单位 OD²；或 mean PSD，单位 OD²/Hz。应分别定义，不能混为一列。\n预处理去除的频率及最终窄带滤波阶段必须可比。频带范围需满足实际采样率、时长、频率分辨率和可用支持；本方案不虚构统一数值频带。",
+      "sourceEvidence": {
+        "sourcePlan": "docs/PYfNIRs机器学习特征与数据组织方案_2026-10-08.txt",
+        "planLineStart": 133,
+        "planLineEnd": 139,
+        "sourceCodeFiles": [
+          "toolbox/+PYfNIRs/Welch_pre.m",
+          "toolbox/+PYfNIRs/PSD_pipeline.m"
+        ]
+      }
+    },
+    {
+      "id": "12",
+      "name": "OD 交叉谱投影",
+      "sourceCapabilityClass": "A",
+      "plannedStatus": "planned",
+      "converterActualStatus": "unverified",
+      "actualSupported": null,
+      "sourceContainerAndFields": [
+        "路径：R.data.all{i,j}，N×N cell，每格 F×1 complex double。",
+        "频率：R.frequency，F×1 double。",
+        "来源：CSDcaculate，文件 *-CSD.mat。"
+      ],
+      "payloadAndShapeEvidence": [
+        "路径：R.data.all{i,j}，N×N cell，每格 F×1 complex double。",
+        "频率：R.frequency，F×1 double。"
+      ],
+      "sampleIdentity": {
+        "grain": "record",
+        "rule": "记录级；稳定RecordID/ObservationID映射study.Observations，节点另用固定标签映射。",
+        "source": "Results记录元数据/显式来源表，经记录键映射study.Observations",
+        "keys": [
+          "ObservationID",
+          "RecordID",
+          "SubjectID",
+          "Condition",
+          "Session",
+          "Timepoint"
+        ]
+      },
+      "hemoglobinRule": "无Hb分量：双波长OD交叉谱平均。",
+      "unitEvidence": [
+        "phase 用频带圆均值，弧度结果再 sin/cos 编码 [编码为 B]。"
+      ],
+      "parametersAndSupport": [
+        "转换前核对源参数/参数指纹、映射指纹及支持条件；无证据时维持unverified。"
+      ],
+      "allowedProjection": [
+        "用法：固定上三角边和频带，选择 magnitude 的均值/积分，或 real 的均值/积分。"
+      ],
+      "explicitRejectsOrDeferrals": [
+        "复数本体不能当作一个实数特征；谱幅值、实部、相位是不同列定义。"
+      ],
+      "sourcePlanText": "12 OD 交叉谱投影 [A：指定投影/频带后]\n路径：R.data.all{i,j}，N×N cell，每格 F×1 complex double。\n频率：R.frequency，F×1 double。\n来源：CSDcaculate，文件 *-CSD.mat。\n实际信号：双波长 OD 交叉谱平均，不是血红蛋白交叉谱。\n用法：固定上三角边和频带，选择 magnitude 的均值/积分，或 real 的均值/积分。\nphase 用频带圆均值，弧度结果再 sin/cos 编码 [编码为 B]。\n复数本体不能当作一个实数特征；谱幅值、实部、相位是不同列定义。",
+      "sourceEvidence": {
+        "sourcePlan": "docs/PYfNIRs机器学习特征与数据组织方案_2026-10-08.txt",
+        "planLineStart": 141,
+        "planLineEnd": 148,
+        "sourceCodeFiles": [
+          "toolbox/+PYfNIRs/CSDcaculate.m",
+          "toolbox/+PYfNIRs/CSD_pipeline.m"
+        ]
+      }
+    },
+    {
+      "id": "13",
+      "name": "动态 FC 边的 Hurst 指数",
+      "sourceCapabilityClass": "A",
+      "plannedStatus": "planned",
+      "converterActualStatus": "unverified",
+      "actualSupported": null,
+      "sourceContainerAndFields": [
+        "路径：R.data.all{1}.(Hb)，double，N×N。",
+        "来源：FCHurst，针对每条动态连接序列计算 H。"
+      ],
+      "payloadAndShapeEvidence": [
+        "路径：R.data.all{1}.(Hb)，double，N×N。"
+      ],
+      "sampleIdentity": {
+        "grain": "record",
+        "rule": "记录级；稳定RecordID/ObservationID映射study.Observations，节点另用固定标签映射。",
+        "source": "Results记录元数据/显式来源表，经记录键映射study.Observations",
+        "keys": [
+          "ObservationID",
+          "RecordID",
+          "SubjectID",
+          "Condition",
+          "Session",
+          "Timepoint"
+        ]
+      },
+      "hemoglobinRule": "按动态网络实际Hb字段。",
+      "unitEvidence": [
+        "方案未声明统一物理单位；须按源算法定义与FeatureDefinition核实，不推断。"
+      ],
+      "parametersAndSupport": [
+        "转换前核对源参数/参数指纹、映射指纹及支持条件；无证据时维持unverified。"
+      ],
+      "allowedProjection": [
+        "用法：仅取原单脑网络严格上三角，保留动态窗口步长与方法定义。"
+      ],
+      "explicitRejectsOrDeferrals": [
+        "窗口序列的采样率是动态窗口时间尺度，不能沿用原始 Hb 时间点的采样率解释。"
+      ],
+      "sourcePlanText": "13 动态 FC 边的 Hurst 指数 [A]\n路径：R.data.all{1}.(Hb)，double，N×N。\n来源：FCHurst，针对每条动态连接序列计算 H。\n用法：仅取原单脑网络严格上三角，保留动态窗口步长与方法定义。\n窗口序列的采样率是动态窗口时间尺度，不能沿用原始 Hb 时间点的采样率解释。",
+      "sourceEvidence": {
+        "sourcePlan": "docs/PYfNIRs机器学习特征与数据组织方案_2026-10-08.txt",
+        "planLineStart": 150,
+        "planLineEnd": 154,
+        "sourceCodeFiles": [
+          "toolbox/+PYfNIRs/FCHurst.m"
+        ]
+      }
+    },
+    {
+      "id": "14",
+      "name": "脑内 MVAR-Granger 有向边",
+      "sourceCapabilityClass": "A/B",
+      "plannedStatus": "planned",
+      "converterActualStatus": "conditionally_supported",
+      "actualSupported": true,
+      "sourceContainerAndFields": [
+        "路径：R.data.WithinBrainMVARGranger.(Hb).GrangerStrength，double，N×N。",
+        "来源：MVARGranger_pipeline，文件 *-MVAR-GRANGER.mat。"
+      ],
+      "payloadAndShapeEvidence": [
+        "路径：R.data.WithinBrainMVARGranger.(Hb).GrangerStrength，double，N×N。",
+        "当前 DA 不直接接受窗口 cell；窗口均值/方差或固定时序需要新增汇总。"
+      ],
+      "sampleIdentity": {
+        "grain": "record",
+        "rule": "记录级；稳定RecordID/ObservationID映射study.Observations，节点另用固定标签映射。",
+        "source": "Results记录元数据/显式来源表，经记录键映射study.Observations",
+        "keys": [
+          "ObservationID",
+          "RecordID",
+          "SubjectID",
+          "Condition",
+          "Session",
+          "Timepoint"
+        ]
+      },
+      "hemoglobinRule": "按实际Granger Hb字段。",
+      "unitEvidence": [
+        "方案未声明统一物理单位；须按源算法定义与FeatureDefinition核实，不推断。"
+      ],
+      "parametersAndSupport": [
+        "若窗口模式开启：R.data.WithinBrainMVARGranger.(Hb){w}.GrangerStrength。",
+        "要求：Status='ok'，相同节点、MVAR 阶数选择规则、采样率和模型设置。"
+      ],
+      "allowedProjection": [
+        "用法：有向 i→j，i≠j，每 Hb 为 N(N-1) 列；保持代码约定的源/目标轴，不能转为无向上三角。"
+      ],
+      "explicitRejectsOrDeferrals": [
+        "用法：有向 i→j，i≠j，每 Hb 为 N(N-1) 列；保持代码约定的源/目标轴，不能转为无向上三角。"
+      ],
+      "sourcePlanText": "14 脑内 MVAR-Granger 有向边 [A：非窗口] / [B：窗口]\n路径：R.data.WithinBrainMVARGranger.(Hb).GrangerStrength，double，N×N。\n若窗口模式开启：R.data.WithinBrainMVARGranger.(Hb){w}.GrangerStrength。\n来源：MVARGranger_pipeline，文件 *-MVAR-GRANGER.mat。\n用法：有向 i→j，i≠j，每 Hb 为 N(N-1) 列；保持代码约定的源/目标轴，不能转为无向上三角。\n要求：Status='ok'，相同节点、MVAR 阶数选择规则、采样率和模型设置。\n当前 DA 不直接接受窗口 cell；窗口均值/方差或固定时序需要新增汇总。\n",
+      "sourceEvidence": {
+        "sourcePlan": "docs/PYfNIRs机器学习特征与数据组织方案_2026-10-08.txt",
+        "planLineStart": 156,
+        "planLineEnd": 162,
+        "sourceCodeFiles": [
+          "toolbox/+PYfNIRs/MVARGranger_pipeline.m",
+          "toolbox/+PYfNIRs/calculateMVARGranger.m"
+        ]
+      },
+      "actualSupportCondition": "Non-windowed MVAR-Granger only: direct GrangerStrength N×N matrix, Status=ok, exact FormulaVersion=conditional_log_residual_variance_ratio_v1, DirectionConvention=row_source_column_target, explicit unique NodeLabels matching matrix axes, Options.Window.Enabled=false; preserve directed i→j. Verified exemplar: HbO ROI-A→ROI-B=0.3, reverse=0.7, fs=10 Hz, order=2. Windowed cell output remains unsupported/unverified.",
+      "actualEvidence": {
+        "matlabFixture": "F:\\桌面\\程序\\PY-ML-support\\tests\\pyfnirs\\fixtures\\raw_results_synthetic_v3\\raw_results_synthetic.mat",
+        "matlabFixtureSha256": "540496de6ffdfb7e1b69839fdffc2a5cefbf74d936af3f9546eae03cf012812d",
+        "helperExport": "F:\\桌面\\程序\\PY-ML-support\\tests\\pyfnirs\\fixtures\\raw_results_synthetic_v3\\raw_results_synthetic.json",
+        "helperExportSha256": "d5860a193a26e3dfd729f31cf4f2edfe5ce0a93c25c170a827eff1e0416d2c8e",
+        "independentExpected": "F:\\桌面\\程序\\PY-ML-support\\tests\\pyfnirs\\fixtures\\raw_results_synthetic_v3\\expected.json",
+        "independentExpectedSha256": "15c790e8aac9d6429ff3f1312e734d4d8c107ab59e97d3ac64f9accc65a8d104",
+        "matlabRelease": "2023a",
+        "matlabVersion": "9.14.0.2206163 (R2023a)",
+        "adapterId": "pyfnirs.raw_results.v1",
+        "memoryPatchClosure": "PASS",
+        "memoryPatchOutputs": {
+          "csvFeatureMatrixSha256": "c21d5c3d451067b076a0a701294ff78256ee18d6a1e3ed28afe641f6a2b1aac9",
+          "xlsxSha256": "616ae448d421b8b14517a664b2cea52b7f713ccaed039147d729eb9c7c65b06c"
+        },
+        "productionRegistryRerun": "PASS; actual MATLAB-v7.3 MAT→raw bridge→core→CSV/XLSX, no registry patch",
+        "productionClosure": {
+          "result": "PASS; fresh Python process; production registry loaded from disk; no registry monkeypatch",
+          "evidenceReport": "H:\\AIcode\\HexiPlan\\runs\\pyfnirs-pyml-converter-20261008-01\\evidence\\raw-feature-production-closure-r1.json",
+          "evidenceReportSha256": "9b22dc32ae80c558f3ff6394c1c60884aa078a08796408ff361becbb71b82a06",
+          "sourceMat": "F:\\桌面\\程序\\PY-ML-support\\tests\\pyfnirs\\fixtures\\raw_results_synthetic_v3\\raw_results_synthetic.mat",
+          "sourceMatSha256": "540496de6ffdfb7e1b69839fdffc2a5cefbf74d936af3f9546eae03cf012812d",
+          "matlabRelease": "2023a",
+          "matlabVersion": "9.14.0.2206163 (R2023a)",
+          "bridgeAdapterId": "pyfnirs.raw_results.v1",
+          "bridgeHelperSha256": "36955bd9fd2b8dceaae087b53628c6ad227f56281365a672e1defe4894bd8ac1",
+          "bridgeDocumentSha256": "b4bf2a4175e679ffb6d11081e30a3d5a4aeeade35a42d1d23777040e6ea5b5e4",
+          "independentExpectedSha256": "15c790e8aac9d6429ff3f1312e734d4d8c107ab59e97d3ac64f9accc65a8d104",
+          "featureIds": [
+            "PH-HBO-H0-PERSISTENCE",
+            "FC-HBO-ROI-A-ROI-B",
+            "MVAR-HBO-ROI-A-TO-ROI-B",
+            "PH-HBR-H1-PERSISTENCE-MISSING"
+          ],
+          "values": [
+            2.5,
+            0.25,
+            0.3,
+            null
+          ],
+          "validMask": [
+            true,
+            true,
+            true,
+            false
+          ],
+          "missingReasons": [
+            "",
+            "",
+            "",
+            "source_nonfinite"
+          ],
+          "identities": {
+            "Group": "synthetic_case",
+            "ObservationID": "OBS-SYN-17",
+            "RecordID": "REC-SYN-17",
+            "SubjectID": "SUB-SYN-9"
+          },
+          "sourceParameters": {
+            "Results.Metadata.FC.Kind": "static",
+            "Results.Metadata.FC.ModelIndex": 1.0,
+            "Results.Metadata.FC.ParameterFingerprint": "SYNTHETIC-PEARSON-v1",
+            "Results.Metadata.MVARGranger.DirectionConvention": "row_source_column_target",
+            "Results.Metadata.MVARGranger.FormulaVersion": "conditional_log_residual_variance_ratio_v1",
+            "Results.Metadata.MVARGranger.Options.Order": 2.0,
+            "Results.Metadata.MVARGranger.Options.Window.Enabled": false,
+            "Results.Metadata.MVARGranger.SamplingRate": 10.0,
+            "Results.Metadata.PersistentHomology.DistanceFormula": "one_minus_similarity_v1",
+            "Results.Metadata.PersistentHomology.Options.InputSemantics": "positive_similarity",
+            "Results.Metadata.PersistentHomology.Options.Threshold": 0.5
+          },
+          "csvOutputs": {
+            "FeatureDictionary.csv": {
+              "path": "H:\\AIcode\\HexiPlan\\runs\\pyfnirs-pyml-converter-20261008-01\\tmp\\raw_feature_closure_production_r1_csv\\FeatureDictionary.csv",
+              "sha256": "137228ee28f09070566fb44e0f9571529e21f42f054e5d35e2a820afc15fc9b1"
+            },
+            "FeatureMatrix.csv": {
+              "path": "H:\\AIcode\\HexiPlan\\runs\\pyfnirs-pyml-converter-20261008-01\\tmp\\raw_feature_closure_production_r1_csv\\FeatureMatrix.csv",
+              "sha256": "c21d5c3d451067b076a0a701294ff78256ee18d6a1e3ed28afe641f6a2b1aac9"
+            },
+            "Provenance.json": {
+              "path": "H:\\AIcode\\HexiPlan\\runs\\pyfnirs-pyml-converter-20261008-01\\tmp\\raw_feature_closure_production_r1_csv\\Provenance.json",
+              "sha256": "d5da1f3eb58c5d65cab33179804705f4226fd33fa55db0b9dca4d41a4783d023"
+            },
+            "Samples.csv": {
+              "path": "H:\\AIcode\\HexiPlan\\runs\\pyfnirs-pyml-converter-20261008-01\\tmp\\raw_feature_closure_production_r1_csv\\Samples.csv",
+              "sha256": "10a6c5bc8dfdd9003b0999aa9c260beb5f8a9d772aa120b18ad60ab6093fa53c"
+            }
+          },
+          "xlsxOutput": {
+            "path": "H:\\AIcode\\HexiPlan\\runs\\pyfnirs-pyml-converter-20261008-01\\tmp\\raw_feature_closure_production_r1.xlsx",
+            "sha256": "1cd0d806e866ca69b6df8fc21e0a84ea729c743077f6119775d47f9cdc937c47"
+          }
+        }
+      }
+    },
+    {
+      "id": "15",
+      "name": "IBS 跨脑连接强度",
+      "sourceCapabilityClass": "A",
+      "plannedStatus": "planned",
+      "converterActualStatus": "unverified",
+      "actualSupported": null,
+      "sourceContainerAndFields": [
+        "路径：R.data.all{1}.(Hb)，double，NA×NB。",
+        "来源：runPairedIBS（CH2IBS / ROI2IBS 调用）。"
+      ],
+      "payloadAndShapeEvidence": [
+        "路径：R.data.all{1}.(Hb)，double，NA×NB。",
+        "用法：A 脑节点×B 脑节点全矩阵展开，包括 A_i-B_i；两个人的同名节点不是单脑自身连接，不得删除“对角线”。",
+        "同步、事件时钟、分析支持或配对语义未核实时，不进入可用脑间特征矩阵。"
+      ],
+      "sampleIdentity": {
+        "grain": "pair",
+        "rule": "配对级；以PairObservationID和study.PairLinks联结，保留双方RecordID、SubjectID与Role。",
+        "source": "显式配对来源表，经PairObservationID映射study.PairLinks",
+        "keys": [
+          "PairObservationID",
+          "PairID",
+          "RecordIDA",
+          "RecordIDB",
+          "SubjectIDA",
+          "SubjectIDB",
+          "RoleA",
+          "RoleB"
+        ]
+      },
+      "hemoglobinRule": "按实际跨脑连接Hb字段。",
+      "unitEvidence": [
+        "方案未声明统一物理单位；须按源算法定义与FeatureDefinition核实，不推断。"
+      ],
+      "parametersAndSupport": [
+        "要求：保存 PairID、PairObservationID、RecordIDA/B、SubjectIDA/B、RoleA/B、Session、Condition、Timepoint 与对齐依据。"
+      ],
+      "allowedProjection": [
+        "用法：A 脑节点×B 脑节点全矩阵展开，包括 A_i-B_i；两个人的同名节点不是单脑自身连接，不得删除“对角线”。"
+      ],
+      "explicitRejectsOrDeferrals": [
+        "用法：A 脑节点×B 脑节点全矩阵展开，包括 A_i-B_i；两个人的同名节点不是单脑自身连接，不得删除“对角线”。"
+      ],
+      "sourcePlanText": "15 IBS 跨脑连接强度 [A]\n路径：R.data.all{1}.(Hb)，double，NA×NB。\n来源：runPairedIBS（CH2IBS / ROI2IBS 调用）。\n模型族与前述 FC 的九种模型对应，逐项保留真实指标含义。\n用法：A 脑节点×B 脑节点全矩阵展开，包括 A_i-B_i；两个人的同名节点不是单脑自身连接，不得删除“对角线”。\n要求：保存 PairID、PairObservationID、RecordIDA/B、SubjectIDA/B、RoleA/B、Session、Condition、Timepoint 与对齐依据。\n同步、事件时钟、分析支持或配对语义未核实时，不进入可用脑间特征矩阵。",
+      "sourceEvidence": {
+        "sourcePlan": "docs/PYfNIRs机器学习特征与数据组织方案_2026-10-08.txt",
+        "planLineStart": 166,
+        "planLineEnd": 172,
+        "sourceCodeFiles": [
+          "toolbox/+PYfNIRs/runPairedIBS.m",
+          "toolbox/+PYfNIRs/IBScaculate.m"
+        ]
+      }
+    },
+    {
+      "id": "16",
+      "name": "IBS 互相关时滞",
+      "sourceCapabilityClass": "A",
+      "plannedStatus": "planned",
+      "converterActualStatus": "unverified",
+      "actualSupported": null,
+      "sourceContainerAndFields": [
+        "路径：R.data.all{2}.(Hb)，double，NA×NB，单位 samples。",
+        "来源：runPairedIBS 中 IBScaculate 的 model=5。"
+      ],
+      "payloadAndShapeEvidence": [
+        "路径：R.data.all{2}.(Hb)，double，NA×NB，单位 samples。"
+      ],
+      "sampleIdentity": {
+        "grain": "pair",
+        "rule": "配对级；以PairObservationID和study.PairLinks联结，保留双方RecordID、SubjectID与Role。",
+        "source": "显式配对来源表，经PairObservationID映射study.PairLinks",
+        "keys": [
+          "PairObservationID",
+          "PairID",
+          "RecordIDA",
+          "RecordIDB",
+          "SubjectIDA",
+          "SubjectIDB",
+          "RoleA",
+          "RoleB"
+        ]
+      },
+      "hemoglobinRule": "按实际lag矩阵字段记录Hb轴，不解释为Hb幅度。",
+      "unitEvidence": [
+        "路径：R.data.all{2}.(Hb)，double，NA×NB，单位 samples。",
+        "用法：逐跨脑边一列，可按实际信号采样率另算 lag_seconds=lag_samples/Fs。"
+      ],
+      "parametersAndSupport": [
+        "转换前核对源参数/参数指纹、映射指纹及支持条件；无证据时维持unverified。"
+      ],
+      "allowedProjection": [
+        "用法：逐跨脑边一列，可按实际信号采样率另算 lag_seconds=lag_samples/Fs。"
+      ],
+      "explicitRejectsOrDeferrals": [
+        "必须记录 A/B 顺序、符号约定、所用记录信号的实际采样率。其它模型的初始化零 lag 不作为科学特征。"
+      ],
+      "sourcePlanText": "16 IBS 互相关时滞 [A：仅 Xcorr]\n路径：R.data.all{2}.(Hb)，double，NA×NB，单位 samples。\n来源：runPairedIBS 中 IBScaculate 的 model=5。\n用法：逐跨脑边一列，可按实际信号采样率另算 lag_seconds=lag_samples/Fs。\n必须记录 A/B 顺序、符号约定、所用记录信号的实际采样率。其它模型的初始化零 lag 不作为科学特征。",
+      "sourceEvidence": {
+        "sourcePlan": "docs/PYfNIRs机器学习特征与数据组织方案_2026-10-08.txt",
+        "planLineStart": 174,
+        "planLineEnd": 178,
+        "sourceCodeFiles": [
+          "toolbox/+PYfNIRs/runPairedIBS.m",
+          "toolbox/+PYfNIRs/IBScaculate.m"
+        ]
+      }
+    },
+    {
+      "id": "17",
+      "name": "跨脑 WTC 频带相干谱",
+      "sourceCapabilityClass": "B",
+      "plannedStatus": "planned",
+      "converterActualStatus": "unverified",
+      "actualSupported": null,
+      "sourceContainerAndFields": [
+        "路径：R.data.all{1}.(Hb){i,j}，NA×NB cell，每格 F×1 double，已沿时间平均。",
+        "来源：CHFOI / ROIFOI / FOIcaculate，单配对文件 *-FOI.mat；这是群体选频检验之前的科学相干谱。"
+      ],
+      "payloadAndShapeEvidence": [
+        "路径：R.data.all{1}.(Hb){i,j}，NA×NB cell，每格 F×1 double，已沿时间平均。",
+        "对应频率：R.data.all{2}.(Hb){i,j}，double 频率向量，逐边核对。",
+        "用法：A_i-B_j 全跨脑矩阵，预定义频带平均或同一网格谱向量。保留角色轴，不强行当作单脑对称上三角。",
+        "当前 DA WTC 谱提取不是此双 cell 层级/跨脑轴的通用读取器，需要单独适配。"
+      ],
+      "sampleIdentity": {
+        "grain": "pair",
+        "rule": "配对级；以PairObservationID和study.PairLinks联结，保留双方RecordID、SubjectID与Role。",
+        "source": "显式配对来源表，经PairObservationID映射study.PairLinks",
+        "keys": [
+          "PairObservationID",
+          "PairID",
+          "RecordIDA",
+          "RecordIDB",
+          "SubjectIDA",
+          "SubjectIDB",
+          "RoleA",
+          "RoleB"
+        ]
+      },
+      "hemoglobinRule": "按实际频谱Hb字段并保留A/B角色轴。",
+      "unitEvidence": [
+        "当前 FOIcaculate 保存的频率支持为 0.01<f<0.7 Hz，并受实际采样率/记录支持限制；若频率降序，必须将频率和对应谱一起排序。"
+      ],
+      "parametersAndSupport": [
+        "转换前核对源参数/参数指纹、映射指纹及支持条件；无证据时维持unverified。"
+      ],
+      "allowedProjection": [
+        "用法：A_i-B_j 全跨脑矩阵，预定义频带平均或同一网格谱向量。保留角色轴，不强行当作单脑对称上三角。"
+      ],
+      "explicitRejectsOrDeferrals": [
+        "当前 DA WTC 谱提取不是此双 cell 层级/跨脑轴的通用读取器，需要单独适配。",
+        "旧文件若仅有文件名配对，必须借真实研究表补充双方记录身份、角色与同步证据后才纳入，不能从名称推断已对齐。"
+      ],
+      "sourcePlanText": "17 跨脑 WTC 频带相干谱 [B]\n路径：R.data.all{1}.(Hb){i,j}，NA×NB cell，每格 F×1 double，已沿时间平均。\n对应频率：R.data.all{2}.(Hb){i,j}，double 频率向量，逐边核对。\n来源：CHFOI / ROIFOI / FOIcaculate，单配对文件 *-FOI.mat；这是群体选频检验之前的科学相干谱。\n用法：A_i-B_j 全跨脑矩阵，预定义频带平均或同一网格谱向量。保留角色轴，不强行当作单脑对称上三角。\n当前 FOIcaculate 保存的频率支持为 0.01<f<0.7 Hz，并受实际采样率/记录支持限制；若频率降序，必须将频率和对应谱一起排序。\n当前 DA WTC 谱提取不是此双 cell 层级/跨脑轴的通用读取器，需要单独适配。\n旧文件若仅有文件名配对，必须借真实研究表补充双方记录身份、角色与同步证据后才纳入，不能从名称推断已对齐。",
+      "sourceEvidence": {
+        "sourcePlan": "docs/PYfNIRs机器学习特征与数据组织方案_2026-10-08.txt",
+        "planLineStart": 180,
+        "planLineEnd": 187,
+        "sourceCodeFiles": [
+          "toolbox/+PYfNIRs/CHFOI.m",
+          "toolbox/+PYfNIRs/ROIFOI.m",
+          "toolbox/+PYfNIRs/FOIcaculate.m"
+        ]
+      }
+    },
+    {
+      "id": "18",
+      "name": "显式对称化的频带 IBS",
+      "sourceCapabilityClass": "B",
+      "plannedStatus": "planned",
+      "converterActualStatus": "unverified",
+      "actualSupported": null,
+      "sourceContainerAndFields": [
+        "单配对路径：R.data.all.(Hb)，N×N double，来源 IBS_mean_caculate，文件 *-FOI-IBS.mat。",
+        "列身份：R.group；边标签：R.label。group 在此来自文件名，不是可以直接作为 y 的实验组标签。"
+      ],
+      "payloadAndShapeEvidence": [
+        "单配对路径：R.data.all.(Hb)，N×N double，来源 IBS_mean_caculate，文件 *-FOI-IBS.mat。",
+        "聚合文件 TaskIBS.mat / RestIBS.mat：R.data.all.(Hb)，[E×M] double，E=N(N+1)/2，为含对角线的边数，M 为配对观察数。",
+        "用法：单配对按上三角含对角线展开；聚合矩阵转置为 [M×E] 并严格匹配文件标签与真实 PairObservationID。",
+        "它与第 15/17 项保留角色的全矩阵定义不同，不能沿用同一 FeatureID。多个频段被现有函数合并为一个均值，不能宣称文件已分别保存每个频段列。",
+        "需保留频带集合、边交换平均规则、时间范围和来源；身份/同步核对要求同第 17 项。当前 DA 常规 IBS 适配期待 data.all{1}，此旧矩阵需要专门适配。"
+      ],
+      "sampleIdentity": {
+        "grain": "pair",
+        "rule": "配对级；以PairObservationID和study.PairLinks联结，保留双方RecordID、SubjectID与Role。",
+        "source": "显式配对来源表，经PairObservationID映射study.PairLinks",
+        "keys": [
+          "PairObservationID",
+          "PairID",
+          "RecordIDA",
+          "RecordIDB",
+          "SubjectIDA",
+          "SubjectIDB",
+          "RoleA",
+          "RoleB"
+        ]
+      },
+      "hemoglobinRule": "按实际对称化IBS Hb字段。",
+      "unitEvidence": [
+        "方案未声明统一物理单位；须按源算法定义与FeatureDefinition核实，不推断。"
+      ],
+      "parametersAndSupport": [
+        "转换前核对源参数/参数指纹、映射指纹及支持条件；无证据时维持unverified。"
+      ],
+      "allowedProjection": [
+        "用法：单配对按上三角含对角线展开；聚合矩阵转置为 [M×E] 并严格匹配文件标签与真实 PairObservationID。"
+      ],
+      "explicitRejectsOrDeferrals": [
+        "它与第 15/17 项保留角色的全矩阵定义不同，不能沿用同一 FeatureID。多个频段被现有函数合并为一个均值，不能宣称文件已分别保存每个频段列。"
+      ],
+      "sourcePlanText": "18 显式对称化的频带 IBS [B：旧输出兼容]\n单配对路径：R.data.all.(Hb)，N×N double，来源 IBS_mean_caculate，文件 *-FOI-IBS.mat。\n聚合文件 TaskIBS.mat / RestIBS.mat：R.data.all.(Hb)，[E×M] double，E=N(N+1)/2，为含对角线的边数，M 为配对观察数。\n列身份：R.group；边标签：R.label。group 在此来自文件名，不是可以直接作为 y 的实验组标签。\n实际语义：同一节点编号下 (A_i-B_j 与 A_j-B_i) 的谱合并后按指定频带均值。适用于预先决定忽略角色交换方向的配对预测。\n用法：单配对按上三角含对角线展开；聚合矩阵转置为 [M×E] 并严格匹配文件标签与真实 PairObservationID。\n它与第 15/17 项保留角色的全矩阵定义不同，不能沿用同一 FeatureID。多个频段被现有函数合并为一个均值，不能宣称文件已分别保存每个频段列。\n需保留频带集合、边交换平均规则、时间范围和来源；身份/同步核对要求同第 17 项。当前 DA 常规 IBS 适配期待 data.all{1}，此旧矩阵需要专门适配。\n",
+      "sourceEvidence": {
+        "sourcePlan": "docs/PYfNIRs机器学习特征与数据组织方案_2026-10-08.txt",
+        "planLineStart": 189,
+        "planLineEnd": 196,
+        "sourceCodeFiles": [
+          "toolbox/+PYfNIRs/IBS_mean_caculate.m",
+          "toolbox/+PYfNIRs/IBSextraction.m"
+        ]
+      }
+    },
+    {
+      "id": "19",
+      "name": "节点图指标",
+      "sourceCapabilityClass": "A",
+      "plannedStatus": "planned",
+      "converterActualStatus": "unverified",
+      "actualSupported": null,
+      "sourceContainerAndFields": [
+        "来源：AutoGraphic / GraphicMetrics_pipeline，文件 *_Graphic.mat。"
+      ],
+      "payloadAndShapeEvidence": [
+        "统一路径：R.data.all{d}.(Hb).(Metric)，struct 内 double 节点向量。"
+      ],
+      "sampleIdentity": {
+        "grain": "record",
+        "rule": "记录级；稳定RecordID/ObservationID映射study.Observations，节点另用固定标签映射。",
+        "source": "Results记录元数据/显式来源表，经记录键映射study.Observations",
+        "keys": [
+          "ObservationID",
+          "RecordID",
+          "SubjectID",
+          "Condition",
+          "Session",
+          "Timepoint"
+        ]
+      },
+      "hemoglobinRule": "按实际图结果Hb字段。",
+      "unitEvidence": [
+        "方案未声明统一物理单位；须按源算法定义与FeatureDefinition核实，不推断。"
+      ],
+      "parametersAndSupport": [
+        "转换前核对源参数/参数指纹、映射指纹及支持条件；无证据时维持unverified。"
+      ],
+      "allowedProjection": [
+        "用法：节点×Hb×固定密度×binary/weighted，各一列；不同图类型是不同定义。"
+      ],
+      "explicitRejectsOrDeferrals": [
+        "社区依赖指标仅在可用且有限时纳入。不能把每份数据中的社区编号直接当作统一类别。"
+      ],
+      "sourcePlanText": "19 节点图指标 [A/B]\n统一路径：R.data.all{d}.(Hb).(Metric)，struct 内 double 节点向量。\n密度对应：R.sparsity(d)；图类型/边策略：R.Configuration.NetworkType / EdgePolicy。\n来源：AutoGraphic / GraphicMetrics_pipeline，文件 *_Graphic.mat。\nA 字段：degree、strength、local_efficiency、clustering_coef_nodes、betweenness、participation_coef。\nB 字段：vulnerability，已输出但当前 DA GRAPH 白名单未包含，需要显式增加提取。\n用法：节点×Hb×固定密度×binary/weighted，各一列；不同图类型是不同定义。\n社区依赖指标仅在可用且有限时纳入。不能把每份数据中的社区编号直接当作统一类别。",
+      "sourceEvidence": {
+        "sourcePlan": "docs/PYfNIRs机器学习特征与数据组织方案_2026-10-08.txt",
+        "planLineStart": 200,
+        "planLineEnd": 207,
+        "sourceCodeFiles": [
+          "toolbox/+PYfNIRs/AutoGraphic.m",
+          "toolbox/+PYfNIRs/caculateGraphic.m",
+          "toolbox/+PYfNIRs-DA/matlab/+PYfNIRsDA/+features/adapterCatalog.m"
+        ]
+      }
+    },
+    {
+      "id": "20",
+      "name": "全局图指标",
+      "sourceCapabilityClass": "A",
+      "plannedStatus": "planned",
+      "converterActualStatus": "unverified",
+      "actualSupported": null,
+      "sourceContainerAndFields": [],
+      "payloadAndShapeEvidence": [
+        "统一路径：R.data.all{d}.(Hb).(Metric)，double 标量。"
+      ],
+      "sampleIdentity": {
+        "grain": "record",
+        "rule": "记录级；稳定RecordID/ObservationID映射study.Observations，节点另用固定标签映射。",
+        "source": "Results记录元数据/显式来源表，经记录键映射study.Observations",
+        "keys": [
+          "ObservationID",
+          "RecordID",
+          "SubjectID",
+          "Condition",
+          "Session",
+          "Timepoint"
+        ]
+      },
+      "hemoglobinRule": "按实际图结果Hb字段。",
+      "unitEvidence": [
+        "方案未声明统一物理单位；须按源算法定义与FeatureDefinition核实，不推断。"
+      ],
+      "parametersAndSupport": [
+        "要求：固定密度、节点覆盖、边策略、图类型；小世界量还需固定随机网络定义、次数和可重复种子。"
+      ],
+      "allowedProjection": [
+        "固定密度单独取值，或预定义共同密度区间的图指标曲线/AUC；AUC为新增整理。"
+      ],
+      "explicitRejectsOrDeferrals": [
+        "charpath/radius/diameter 等非有限值按缺失处理，不能把 Inf 填成零。若改用可达路径语义，必须另建列定义，不能静默替换。"
+      ],
+      "sourcePlanText": "20 全局图指标 [A/B]\n统一路径：R.data.all{d}.(Hb).(Metric)，double 标量。\nA 字段：charpath、global_eff、mean_local_efficiency、clustering_coef、transitivity、modularity、assortativity、radius、diameter。\nB 字段：hierarchy、small_worldness，以及 small_world.NormalizedClustering、small_world.NormalizedPathLength。\n要求：固定密度、节点覆盖、边策略、图类型；小世界量还需固定随机网络定义、次数和可重复种子。\ncharpath/radius/diameter 等非有限值按缺失处理，不能把 Inf 填成零。若改用可达路径语义，必须另建列定义，不能静默替换。\n固定密度单独取值，或预定义共同密度区间的图指标曲线/AUC [B]。AUC 是新增整理，不是当前 DA 的现成输出。\n",
+      "sourceEvidence": {
+        "sourcePlan": "docs/PYfNIRs机器学习特征与数据组织方案_2026-10-08.txt",
+        "planLineStart": 209,
+        "planLineEnd": 215,
+        "sourceCodeFiles": [
+          "toolbox/+PYfNIRs/AutoGraphic.m",
+          "toolbox/+PYfNIRs/caculateGraphic.m"
+        ]
+      }
+    },
+    {
+      "id": "21",
+      "name": "任务 GLM 系数与预登记对比",
+      "sourceCapabilityClass": "A",
+      "plannedStatus": "planned",
+      "converterActualStatus": "unverified",
+      "actualSupported": null,
+      "sourceContainerAndFields": [
+        "路径：Results.Analyses.TaskResponse.(LEVEL)(r).Outputs(o).Beta，double 系数向量。"
+      ],
+      "payloadAndShapeEvidence": [
+        "路径：Results.Analyses.TaskResponse.(LEVEL)(r).Outputs(o).Beta，double 系数向量。"
+      ],
+      "sampleIdentity": {
+        "grain": "record",
+        "rule": "记录级；稳定RecordID/ObservationID映射study.Observations，节点另用固定标签映射。",
+        "source": "Results记录元数据/显式来源表，经记录键映射study.Observations",
+        "keys": [
+          "ObservationID",
+          "RecordID",
+          "SubjectID",
+          "Condition",
+          "Session",
+          "Timepoint"
+        ]
+      },
+      "hemoglobinRule": "按Outputs(o).Hemoglobin。",
+      "unitEvidence": [
+        "方案未声明统一物理单位；须按源算法定义与FeatureDefinition核实，不推断。"
+      ],
+      "parametersAndSupport": [
+        "要求：FitStatus='ok'，相同 Basis、HRF 定义/归一化和设计语义。仅取任务或预先指定的行为调制系数。"
+      ],
+      "allowedProjection": [
+        "用法：按任务条件与设计列精确选择 Beta；或固定、按完整列顺序匹配的 c'β。"
+      ],
+      "explicitRejectsOrDeferrals": [
+        "当前 DA selectedTask 还要求统一 Designs。多设计/个体化情况下应单独核对，不能声称所有任务响应都已可直接提取。"
+      ],
+      "sourcePlanText": "21 任务 GLM 系数与预登记对比 [A：统一设计条件下]\n路径：Results.Analyses.TaskResponse.(LEVEL)(r).Outputs(o).Beta，double 系数向量。\n列名：同一 Outputs(o).DesignColumnNames；Hb/节点：.Hemoglobin / .UnitID / .UnitName。\n用法：按任务条件与设计列精确选择 Beta；或固定、按完整列顺序匹配的 c'β。\n要求：FitStatus='ok'，相同 Basis、HRF 定义/归一化和设计语义。仅取任务或预先指定的行为调制系数。\n个体化 HRF 或不同设计导致系数含义改变时，不强行并成统一 β 列。\n当前 DA selectedTask 还要求统一 Designs。多设计/个体化情况下应单独核对，不能声称所有任务响应都已可直接提取。",
+      "sourceEvidence": {
+        "sourcePlan": "docs/PYfNIRs机器学习特征与数据组织方案_2026-10-08.txt",
+        "planLineStart": 219,
+        "planLineEnd": 225,
+        "sourceCodeFiles": [
+          "toolbox/+PYfNIRs/TaskResponse_pipeline.m",
+          "toolbox/+PYfNIRs/fitTaskGLM.m"
+        ]
+      }
+    },
+    {
+      "id": "22",
+      "name": "任务响应曲线",
+      "sourceCapabilityClass": "B",
+      "plannedStatus": "planned",
+      "converterActualStatus": "unverified",
+      "actualSupported": null,
+      "sourceContainerAndFields": [
+        "路径：Results.Analyses.TaskResponse.(LEVEL)(r).Outputs(o).ResponseCurves(c).EstimatedResponse，double 时序向量。"
+      ],
+      "payloadAndShapeEvidence": [
+        "路径：Results.Analyses.TaskResponse.(LEVEL)(r).Outputs(o).ResponseCurves(c).EstimatedResponse，double 时序向量。",
+        "曲线是已有输出，摘要提取是新步骤。不同条件不能混合为一个未注明条件的向量。"
+      ],
+      "sampleIdentity": {
+        "grain": "record",
+        "rule": "记录级；稳定RecordID/ObservationID映射study.Observations，节点另用固定标签映射。",
+        "source": "Results记录元数据/显式来源表，经记录键映射study.Observations",
+        "keys": [
+          "ObservationID",
+          "RecordID",
+          "SubjectID",
+          "Condition",
+          "Session",
+          "Timepoint"
+        ]
+      },
+      "hemoglobinRule": "沿用所属任务输出的Hemoglobin。",
+      "unitEvidence": [
+        "时间：同一曲线 .TimeSeconds；条件：.Condition；系数：.Coefficients。"
+      ],
+      "parametersAndSupport": [
+        "转换前核对源参数/参数指纹、映射指纹及支持条件；无证据时维持unverified。"
+      ],
+      "allowedProjection": [
+        "用法：在预先指定的共同时间范围和网格上，作为固定曲线输入；或新增计算响应 PeakValue、PeakTime、Mean、Area、Slope 等摘要。"
+      ],
+      "explicitRejectsOrDeferrals": [
+        "曲线是已有输出，摘要提取是新步骤。不同条件不能混合为一个未注明条件的向量。"
+      ],
+      "sourcePlanText": "22 任务响应曲线 [B]\n路径：Results.Analyses.TaskResponse.(LEVEL)(r).Outputs(o).ResponseCurves(c).EstimatedResponse，double 时序向量。\n时间：同一曲线 .TimeSeconds；条件：.Condition；系数：.Coefficients。\n用法：在预先指定的共同时间范围和网格上，作为固定曲线输入；或新增计算响应 PeakValue、PeakTime、Mean、Area、Slope 等摘要。\n曲线是已有输出，摘要提取是新步骤。不同条件不能混合为一个未注明条件的向量。",
+      "sourceEvidence": {
+        "sourcePlan": "docs/PYfNIRs机器学习特征与数据组织方案_2026-10-08.txt",
+        "planLineStart": 227,
+        "planLineEnd": 231,
+        "sourceCodeFiles": [
+          "toolbox/+PYfNIRs/TaskResponse_pipeline.m"
+        ]
+      }
+    },
+    {
+      "id": "23",
+      "name": "正则化 HRF 去卷积估计时序",
+      "sourceCapabilityClass": "B",
+      "plannedStatus": "planned",
+      "converterActualStatus": "unverified",
+      "actualSupported": null,
+      "sourceContainerAndFields": [
+        "路径：Results.Analyses.TaskResponse.(LEVEL)(r).Outputs(o).Deconvolution.EstimatedNeuralActivity。"
+      ],
+      "payloadAndShapeEvidence": [
+        "类型：T×1 double。要求 .Status='complete'，明确观察掩码及共同 HRF、Lambda、DifferenceOrder 和边界处理。"
+      ],
+      "sampleIdentity": {
+        "grain": "record",
+        "rule": "记录级；稳定RecordID/ObservationID映射study.Observations，节点另用固定标签映射。",
+        "source": "Results记录元数据/显式来源表，经记录键映射study.Observations",
+        "keys": [
+          "ObservationID",
+          "RecordID",
+          "SubjectID",
+          "Condition",
+          "Session",
+          "Timepoint"
+        ]
+      },
+      "hemoglobinRule": "沿用该输出的信号Hb与单位定义。",
+      "unitEvidence": [
+        "方案未声明统一物理单位；须按源算法定义与FeatureDefinition核实，不推断。"
+      ],
+      "parametersAndSupport": [
+        "转换前核对源参数/参数指纹、映射指纹及支持条件；无证据时维持unverified。"
+      ],
+      "allowedProjection": [
+        "用法：固定网格的模型估计序列或预登记时段摘要；不要把它解释为直接测得的神经活动。"
+      ],
+      "explicitRejectsOrDeferrals": [
+        "放在实验性候选块，先用训练数据验证增量价值，不作为第一版默认输入。"
+      ],
+      "sourcePlanText": "23 正则化 HRF 去卷积估计时序 [B：可选实验特征]\n路径：Results.Analyses.TaskResponse.(LEVEL)(r).Outputs(o).Deconvolution.EstimatedNeuralActivity。\n类型：T×1 double。要求 .Status='complete'，明确观察掩码及共同 HRF、Lambda、DifferenceOrder 和边界处理。\n用法：固定网格的模型估计序列或预登记时段摘要；不要把它解释为直接测得的神经活动。\n放在实验性候选块，先用训练数据验证增量价值，不作为第一版默认输入。\n",
+      "sourceEvidence": {
+        "sourcePlan": "docs/PYfNIRs机器学习特征与数据组织方案_2026-10-08.txt",
+        "planLineStart": 233,
+        "planLineEnd": 237,
+        "sourceCodeFiles": [
+          "toolbox/+PYfNIRs/TaskResponse_pipeline.m",
+          "toolbox/+PYfNIRs/deconvolveTaskSignal.m"
+        ]
+      }
+    },
+    {
+      "id": "24",
+      "name": "持续同调标量",
+      "sourceCapabilityClass": "A",
+      "plannedStatus": "planned",
+      "converterActualStatus": "conditionally_supported",
+      "actualSupported": true,
+      "sourceContainerAndFields": [
+        "路径：R.data.PersistentHomology.(Hb).Features.H0 / H1，各为 struct。"
+      ],
+      "payloadAndShapeEvidence": [
+        "路径：R.data.PersistentHomology.(Hb).Features.H0 / H1，各为 struct。",
+        "类型：double 标量。来源：PersistentHomology_pipeline，文件 *-PH.mat。"
+      ],
+      "sampleIdentity": {
+        "grain": "record",
+        "rule": "记录级；稳定RecordID/ObservationID映射study.Observations，节点另用固定标签映射。",
+        "source": "Results记录元数据/显式来源表，经记录键映射study.Observations",
+        "keys": [
+          "ObservationID",
+          "RecordID",
+          "SubjectID",
+          "Condition",
+          "Session",
+          "Timepoint"
+        ]
+      },
+      "hemoglobinRule": "按实际拓扑结果Hb字段。",
+      "unitEvidence": [
+        "方案未声明统一物理单位；须按源算法定义与FeatureDefinition核实，不推断。"
+      ],
+      "parametersAndSupport": [
+        "要求：Status='ok'，一致节点、连接转距离规则、过滤范围和有限区间处理。"
+      ],
+      "allowedProjection": [
+        "候选：TotalPersistence、PersistenceEntropy；H1 的 FinitePositiveIntervalCount 也可作为候选。"
+      ],
+      "explicitRejectsOrDeferrals": [
+        "未由本项方案确认的投影暂缓；仍遵守全局身份、缺失和防泄漏规则。"
+      ],
+      "sourcePlanText": "24 持续同调标量 [A]\n路径：R.data.PersistentHomology.(Hb).Features.H0 / H1，各为 struct。\n候选：TotalPersistence、PersistenceEntropy；H1 的 FinitePositiveIntervalCount 也可作为候选。\n类型：double 标量。来源：PersistentHomology_pipeline，文件 *-PH.mat。\n要求：Status='ok'，一致节点、连接转距离规则、过滤范围和有限区间处理。\n当前配置下若某个区间计数恒定，在训练折中删除，不预设它必然有信息。",
+      "sourceEvidence": {
+        "sourcePlan": "docs/PYfNIRs机器学习特征与数据组织方案_2026-10-08.txt",
+        "planLineStart": 241,
+        "planLineEnd": 246,
+        "sourceCodeFiles": [
+          "toolbox/+PYfNIRs/PersistentHomology_pipeline.m",
+          "toolbox/+PYfNIRs/calculatePersistentHomology.m"
+        ]
+      },
+      "actualSupportCondition": "Persistent-homology scalar TotalPersistence only under Status=ok, explicit node order and consistent InputSemantics/Threshold/DistanceFormula metadata. Verified exemplar: HbO H0 TotalPersistence=2.5; HbR H1 source NaN is retained as invalid/source_nonfinite, not zero-filled. Evidence does not validate other PH components or external-library semantics.",
+      "actualEvidence": {
+        "matlabFixture": "F:\\桌面\\程序\\PY-ML-support\\tests\\pyfnirs\\fixtures\\raw_results_synthetic_v3\\raw_results_synthetic.mat",
+        "matlabFixtureSha256": "540496de6ffdfb7e1b69839fdffc2a5cefbf74d936af3f9546eae03cf012812d",
+        "helperExport": "F:\\桌面\\程序\\PY-ML-support\\tests\\pyfnirs\\fixtures\\raw_results_synthetic_v3\\raw_results_synthetic.json",
+        "helperExportSha256": "d5860a193a26e3dfd729f31cf4f2edfe5ce0a93c25c170a827eff1e0416d2c8e",
+        "independentExpected": "F:\\桌面\\程序\\PY-ML-support\\tests\\pyfnirs\\fixtures\\raw_results_synthetic_v3\\expected.json",
+        "independentExpectedSha256": "15c790e8aac9d6429ff3f1312e734d4d8c107ab59e97d3ac64f9accc65a8d104",
+        "matlabRelease": "2023a",
+        "matlabVersion": "9.14.0.2206163 (R2023a)",
+        "adapterId": "pyfnirs.raw_results.v1",
+        "memoryPatchClosure": "PASS",
+        "memoryPatchOutputs": {
+          "csvFeatureMatrixSha256": "c21d5c3d451067b076a0a701294ff78256ee18d6a1e3ed28afe641f6a2b1aac9",
+          "xlsxSha256": "616ae448d421b8b14517a664b2cea52b7f713ccaed039147d729eb9c7c65b06c"
+        },
+        "productionRegistryRerun": "PASS; actual MATLAB-v7.3 MAT→raw bridge→core→CSV/XLSX, no registry patch",
+        "productionClosure": {
+          "result": "PASS; fresh Python process; production registry loaded from disk; no registry monkeypatch",
+          "evidenceReport": "H:\\AIcode\\HexiPlan\\runs\\pyfnirs-pyml-converter-20261008-01\\evidence\\raw-feature-production-closure-r1.json",
+          "evidenceReportSha256": "9b22dc32ae80c558f3ff6394c1c60884aa078a08796408ff361becbb71b82a06",
+          "sourceMat": "F:\\桌面\\程序\\PY-ML-support\\tests\\pyfnirs\\fixtures\\raw_results_synthetic_v3\\raw_results_synthetic.mat",
+          "sourceMatSha256": "540496de6ffdfb7e1b69839fdffc2a5cefbf74d936af3f9546eae03cf012812d",
+          "matlabRelease": "2023a",
+          "matlabVersion": "9.14.0.2206163 (R2023a)",
+          "bridgeAdapterId": "pyfnirs.raw_results.v1",
+          "bridgeHelperSha256": "36955bd9fd2b8dceaae087b53628c6ad227f56281365a672e1defe4894bd8ac1",
+          "bridgeDocumentSha256": "b4bf2a4175e679ffb6d11081e30a3d5a4aeeade35a42d1d23777040e6ea5b5e4",
+          "independentExpectedSha256": "15c790e8aac9d6429ff3f1312e734d4d8c107ab59e97d3ac64f9accc65a8d104",
+          "featureIds": [
+            "PH-HBO-H0-PERSISTENCE",
+            "FC-HBO-ROI-A-ROI-B",
+            "MVAR-HBO-ROI-A-TO-ROI-B",
+            "PH-HBR-H1-PERSISTENCE-MISSING"
+          ],
+          "values": [
+            2.5,
+            0.25,
+            0.3,
+            null
+          ],
+          "validMask": [
+            true,
+            true,
+            true,
+            false
+          ],
+          "missingReasons": [
+            "",
+            "",
+            "",
+            "source_nonfinite"
+          ],
+          "identities": {
+            "Group": "synthetic_case",
+            "ObservationID": "OBS-SYN-17",
+            "RecordID": "REC-SYN-17",
+            "SubjectID": "SUB-SYN-9"
+          },
+          "sourceParameters": {
+            "Results.Metadata.FC.Kind": "static",
+            "Results.Metadata.FC.ModelIndex": 1.0,
+            "Results.Metadata.FC.ParameterFingerprint": "SYNTHETIC-PEARSON-v1",
+            "Results.Metadata.MVARGranger.DirectionConvention": "row_source_column_target",
+            "Results.Metadata.MVARGranger.FormulaVersion": "conditional_log_residual_variance_ratio_v1",
+            "Results.Metadata.MVARGranger.Options.Order": 2.0,
+            "Results.Metadata.MVARGranger.Options.Window.Enabled": false,
+            "Results.Metadata.MVARGranger.SamplingRate": 10.0,
+            "Results.Metadata.PersistentHomology.DistanceFormula": "one_minus_similarity_v1",
+            "Results.Metadata.PersistentHomology.Options.InputSemantics": "positive_similarity",
+            "Results.Metadata.PersistentHomology.Options.Threshold": 0.5
+          },
+          "csvOutputs": {
+            "FeatureDictionary.csv": {
+              "path": "H:\\AIcode\\HexiPlan\\runs\\pyfnirs-pyml-converter-20261008-01\\tmp\\raw_feature_closure_production_r1_csv\\FeatureDictionary.csv",
+              "sha256": "137228ee28f09070566fb44e0f9571529e21f42f054e5d35e2a820afc15fc9b1"
+            },
+            "FeatureMatrix.csv": {
+              "path": "H:\\AIcode\\HexiPlan\\runs\\pyfnirs-pyml-converter-20261008-01\\tmp\\raw_feature_closure_production_r1_csv\\FeatureMatrix.csv",
+              "sha256": "c21d5c3d451067b076a0a701294ff78256ee18d6a1e3ed28afe641f6a2b1aac9"
+            },
+            "Provenance.json": {
+              "path": "H:\\AIcode\\HexiPlan\\runs\\pyfnirs-pyml-converter-20261008-01\\tmp\\raw_feature_closure_production_r1_csv\\Provenance.json",
+              "sha256": "d5da1f3eb58c5d65cab33179804705f4226fd33fa55db0b9dca4d41a4783d023"
+            },
+            "Samples.csv": {
+              "path": "H:\\AIcode\\HexiPlan\\runs\\pyfnirs-pyml-converter-20261008-01\\tmp\\raw_feature_closure_production_r1_csv\\Samples.csv",
+              "sha256": "10a6c5bc8dfdd9003b0999aa9c260beb5f8a9d772aa120b18ad60ab6093fa53c"
+            }
+          },
+          "xlsxOutput": {
+            "path": "H:\\AIcode\\HexiPlan\\runs\\pyfnirs-pyml-converter-20261008-01\\tmp\\raw_feature_closure_production_r1.xlsx",
+            "sha256": "1cd0d806e866ca69b6df8fc21e0a84ea729c743077f6119775d47f9cdc937c47"
+          }
+        }
+      }
+    },
+    {
+      "id": "25",
+      "name": "Betti 曲线和 Persistence Image",
+      "sourceCapabilityClass": "B",
+      "plannedStatus": "planned",
+      "converterActualStatus": "unverified",
+      "actualSupported": null,
+      "sourceContainerAndFields": [],
+      "payloadAndShapeEvidence": [
+        "曲线路径：R.data.PersistentHomology.(Hb).BettiCurve.H0 / H1，double 向量。",
+        "图像路径：R.data.PersistentHomology.(Hb).PersistenceImage.H0 / H1.Image，double 二维矩阵，仅启用时存在。"
+      ],
+      "sampleIdentity": {
+        "grain": "record",
+        "rule": "记录级；稳定RecordID/ObservationID映射study.Observations，节点另用固定标签映射。",
+        "source": "Results记录元数据/显式来源表，经记录键映射study.Observations",
+        "keys": [
+          "ObservationID",
+          "RecordID",
+          "SubjectID",
+          "Condition",
+          "Session",
+          "Timepoint"
+        ]
+      },
+      "hemoglobinRule": "按实际拓扑结果Hb字段。",
+      "unitEvidence": [
+        "方案未声明统一物理单位；须按源算法定义与FeatureDefinition核实，不推断。"
+      ],
+      "parametersAndSupport": [
+        "转换前核对源参数/参数指纹、映射指纹及支持条件；无证据时维持unverified。"
+      ],
+      "allowedProjection": [
+        "用法：共同 filtration 网格上展开曲线；共同 birth/persistence 范围和固定分辨率下展开 Image 或作为图像输入。"
+      ],
+      "explicitRejectsOrDeferrals": [
+        "必须固定轴范围、网格、Sigma、权重和归一化。当前自动按各记录范围生成的图像不能仅因像素数相同就拼接。"
+      ],
+      "sourcePlanText": "25 Betti 曲线和 Persistence Image [B]\n曲线路径：R.data.PersistentHomology.(Hb).BettiCurve.H0 / H1，double 向量。\n曲线轴：.BettiCurve.FiltrationValues。\n图像路径：R.data.PersistentHomology.(Hb).PersistenceImage.H0 / H1.Image，double 二维矩阵，仅启用时存在。\n用法：共同 filtration 网格上展开曲线；共同 birth/persistence 范围和固定分辨率下展开 Image 或作为图像输入。\n必须固定轴范围、网格、Sigma、权重和归一化。当前自动按各记录范围生成的图像不能仅因像素数相同就拼接。\n若范围从数据学习，限于训练折，随后冻结到验证/测试记录。当前 DA 仅支持标量拓扑摘要，曲线/图像需专门整理。",
+      "sourceEvidence": {
+        "sourcePlan": "docs/PYfNIRs机器学习特征与数据组织方案_2026-10-08.txt",
+        "planLineStart": 248,
+        "planLineEnd": 254,
+        "sourceCodeFiles": [
+          "toolbox/+PYfNIRs/calculatePersistentHomology.m",
+          "toolbox/+PYfNIRs/calculatePersistenceImage.m"
+        ]
+      }
+    },
+    {
+      "id": "26",
+      "name": "共享 Gaussian HMM 状态占比",
+      "sourceCapabilityClass": "A/B",
+      "plannedStatus": "planned",
+      "converterActualStatus": "unverified",
+      "actualSupported": null,
+      "sourceContainerAndFields": [
+        "来源文件：Shared-GHMM.mat，顶层 Results，显式 -v7.3。",
+        "逐记录占比：.Result.PosteriorOccupancy，1×K double；.Result.ViterbiOccupancy，1×K double。",
+        "逐记录转移：.Result.TransitionCounts，K×K double；新增行归一化形成每记录的经验转移概率，零访问行记为缺失。",
+        "停留：.Result.DwellDurationsSeconds，1×K cell，每项为该状态停留时长；新增 mean/median 等固定摘要。"
+      ],
+      "payloadAndShapeEvidence": [
+        "逐记录占比：.Result.PosteriorOccupancy，1×K double；.Result.ViterbiOccupancy，1×K double。",
+        "逐记录转移：.Result.TransitionCounts，K×K double；新增行归一化形成每记录的经验转移概率，零访问行记为缺失。",
+        "停留：.Result.DwellDurationsSeconds，1×K cell，每项为该状态停留时长；新增 mean/median 等固定摘要。",
+        "可保留 .Result.PosteriorProbabilities 的固定时间序列 [B]，它可能是按序列组织的 cell。"
+      ],
+      "sampleIdentity": {
+        "grain": "record",
+        "rule": "记录级；稳定RecordID/ObservationID映射study.Observations，节点另用固定标签映射。",
+        "source": "Results记录元数据/显式来源表，经记录键映射study.Observations",
+        "keys": [
+          "ObservationID",
+          "RecordID",
+          "SubjectID",
+          "Condition",
+          "Session",
+          "Timepoint"
+        ]
+      },
+      "hemoglobinRule": "由共享模型输入FeatureNames/定义确定，不自行推断Hb。",
+      "unitEvidence": [
+        "停留：.Result.DwellDurationsSeconds，1×K cell，每项为该状态停留时长；新增 mean/median 等固定摘要。"
+      ],
+      "parametersAndSupport": [
+        "转换前核对源参数/参数指纹、映射指纹及支持条件；无证据时维持unverified。"
+      ],
+      "allowedProjection": [
+        "逐记录占比：.Result.PosteriorOccupancy，1×K double；.Result.ViterbiOccupancy，1×K double。"
+      ],
+      "explicitRejectsOrDeferrals": [
+        "未由本项方案确认的投影暂缓；仍遵守全局身份、缺失和防泄漏规则。"
+      ],
+      "sourcePlanText": "26 共享 Gaussian HMM 状态占比 [A：PosteriorOccupancy] / [B：其它摘要]\n来源文件：Shared-GHMM.mat，顶层 Results，显式 -v7.3。\n共享模型：R.data.GaussianHMM；逐记录结果：\nR.data.TrainingDecoded(r).RecordID / .Result；\nR.data.ValidationDecoded(r).RecordID / .Result。\n逐记录占比：.Result.PosteriorOccupancy，1×K double；.Result.ViterbiOccupancy，1×K double。\n逐记录转移：.Result.TransitionCounts，K×K double；新增行归一化形成每记录的经验转移概率，零访问行记为缺失。\n停留：.Result.DwellDurationsSeconds，1×K cell，每项为该状态停留时长；新增 mean/median 等固定摘要。\n可保留 .Result.PosteriorProbabilities 的固定时间序列 [B]，它可能是按序列组织的 cell。\n当前 DA 可按 RecordID 和 StateIndex 提取共享模型的后验平均占比；其它状态摘要需新增提取。\n必须只在训练折拟合共享模型，验证和测试调用冻结模型解码。不同折的状态列只在各自模型内部有意义，不对其无依据地跨折平均成一个语义状态。\n不取共享模型自身的总体 TransitionMatrix 作为每个样本的值。",
+      "sourceEvidence": {
+        "sourcePlan": "docs/PYfNIRs机器学习特征与数据组织方案_2026-10-08.txt",
+        "planLineStart": 256,
+        "planLineEnd": 267,
+        "sourceCodeFiles": [
+          "toolbox/+PYfNIRs/GaussianHMM_pipeline.m",
+          "toolbox/+PYfNIRs/decodeGaussianHMM.m"
+        ]
+      }
+    },
+    {
+      "id": "27",
+      "name": "多模态早期融合表示",
+      "sourceCapabilityClass": "B",
+      "plannedStatus": "planned",
+      "converterActualStatus": "unverified",
+      "actualSupported": null,
+      "sourceContainerAndFields": [
+        "路径：Results.Data.EarlyFusion.Training(r).FusedValues / Validation(r).FusedValues。"
+      ],
+      "payloadAndShapeEvidence": [
+        "类型：double，T_r×P，并非自动一记录一行。",
+        "列名：同一条目 .FeatureNames，cell 文本；模态来源：.ModalitySource；可用行：.CommonValidMask。"
+      ],
+      "sampleIdentity": {
+        "grain": "record_session",
+        "rule": "记录/会话级；保留RecordID、SubjectID、PairID、Session并映射study.Observations。",
+        "source": "融合条目记录元数据并映射study.Observations",
+        "keys": [
+          "RecordID",
+          "SubjectID",
+          "PairID",
+          "Session",
+          "Condition"
+        ]
+      },
+      "hemoglobinRule": "由FeatureNames和ModalitySource决定，不默认是Hb特征。",
+      "unitEvidence": [
+        "方案未声明统一物理单位；须按源算法定义与FeatureDefinition核实，不推断。"
+      ],
+      "parametersAndSupport": [
+        "转换前核对源参数/参数指纹、映射指纹及支持条件；无证据时维持unverified。"
+      ],
+      "allowedProjection": [
+        "用法：固定序列或预登记记录级摘要；已有融合只对提供的上游 EEG/fNIRS 特征进行同步/融合，不据此虚构原始 EEG 自动特征提取能力。"
+      ],
+      "explicitRejectsOrDeferrals": [
+        "当前 DA 不是该表示的通用直接适配器，需要独立整理。"
+      ],
+      "sourcePlanText": "27 多模态早期融合表示 [B]\n累计 MAT：顶层 Results，显式 -v7.3。\n路径：Results.Data.EarlyFusion.Training(r).FusedValues / Validation(r).FusedValues。\n类型：double，T_r×P，并非自动一记录一行。\n列名：同一条目 .FeatureNames，cell 文本；模态来源：.ModalitySource；可用行：.CommonValidMask。\n记录身份：同一条目的 RecordID、SubjectID、PairID、Session。\n模型：Results.Data.EarlyFusion.Model；所有标准化/PCA 必须只在训练折拟合并冻结应用。\n用法：固定序列或预登记记录级摘要；已有融合只对提供的上游 EEG/fNIRS 特征进行同步/融合，不据此虚构原始 EEG 自动特征提取能力。\n当前 DA 不是该表示的通用直接适配器，需要独立整理。\n",
+      "sourceEvidence": {
+        "sourcePlan": "docs/PYfNIRs机器学习特征与数据组织方案_2026-10-08.txt",
+        "planLineStart": 269,
+        "planLineEnd": 277,
+        "sourceCodeFiles": [
+          "toolbox/+PYfNIRs/MultimodalFusion_pipeline.m",
+          "toolbox/+PYfNIRs/applyMultimodalEarlyFusion.m"
+        ]
+      }
+    },
+    {
+      "id": "28",
+      "name": "预处理 Hb 时序",
+      "sourceCapabilityClass": "B",
+      "plannedStatus": "planned",
+      "converterActualStatus": "unverified",
+      "actualSupported": null,
+      "sourceContainerAndFields": [
+        "累计路径：Results.Data.CH.Subjects(r).Results.dc.dataTimeSeries。",
+        "累计路径：Results.Data.ROI.Subjects(r).Results.data.all{n}.(Hb)。"
+      ],
+      "payloadAndShapeEvidence": [
+        "CH 独立路径：R.dc.dataTimeSeries，T×(3N) double。",
+        "ROI 独立路径：R.data.all{n}.(Hb)，每节点 T×1 double；时间 R.timeseries。"
+      ],
+      "sampleIdentity": {
+        "grain": "record_sequence",
+        "rule": "记录级序列；显式RecordID/ObservationID、验证的时间网格、节点/Hb轴和mask。",
+        "source": "序列所属记录身份加时间网格；时间点不自动成为独立样本",
+        "keys": [
+          "ObservationID",
+          "RecordID",
+          "TimeGrid",
+          "NodeID",
+          "Hemoglobin"
+        ]
+      },
+      "hemoglobinRule": "CH列次序必须由measurementList验证；ROI按实际Hb字段。",
+      "unitEvidence": [
+        "用法：经验证的共同时间单位/采样网格，统一节点次序和固定任务窗，整理为 [样本×时间×节点×Hb]。",
+        "采样单位未知或事件/支持不对齐时不生成时序训练单元；缺失与 padding 保留独立 mask。"
+      ],
+      "parametersAndSupport": [
+        "转换前核对源参数/参数指纹、映射指纹及支持条件；无证据时维持unverified。"
+      ],
+      "allowedProjection": [
+        "用法：经验证的共同时间单位/采样网格，统一节点次序和固定任务窗，整理为 [样本×时间×节点×Hb]。"
+      ],
+      "explicitRejectsOrDeferrals": [
+        "第一版普通表格模型优先用上述已计算摘要。HbT=HbO+HbR 的冗余是否有必要保留，在训练折中评估，不能把三者视为独立测量。"
+      ],
+      "sourcePlanText": "28 预处理 Hb 时序 [B：序列/深度学习]\nCH 独立路径：R.dc.dataTimeSeries，T×(3N) double。\n主包顺序：[HbO 的 N 列，HbR 的 N 列，HbT 的 N 列]，同时核对 .dc.measurementList。\n累计路径：Results.Data.CH.Subjects(r).Results.dc.dataTimeSeries。\nROI 独立路径：R.data.all{n}.(Hb)，每节点 T×1 double；时间 R.timeseries。\n累计路径：Results.Data.ROI.Subjects(r).Results.data.all{n}.(Hb)。\n用法：经验证的共同时间单位/采样网格，统一节点次序和固定任务窗，整理为 [样本×时间×节点×Hb]。\n采样单位未知或事件/支持不对齐时不生成时序训练单元；缺失与 padding 保留独立 mask。\n第一版普通表格模型优先用上述已计算摘要。HbT=HbO+HbR 的冗余是否有必要保留，在训练折中评估，不能把三者视为独立测量。",
+      "sourceEvidence": {
+        "sourcePlan": "docs/PYfNIRs机器学习特征与数据组织方案_2026-10-08.txt",
+        "planLineStart": 281,
+        "planLineEnd": 289,
+        "sourceCodeFiles": [
+          "toolbox/+PYfNIRs/Pre.m",
+          "toolbox/+PYfNIRs/convertChannelsToROI.m",
+          "toolbox/+PYfNIRs/buildPreprocessedBundle.m"
+        ]
+      }
+    },
+    {
+      "id": "29",
+      "name": "已明确登记的特征基线差值",
+      "sourceCapabilityClass": "B",
+      "plannedStatus": "planned",
+      "converterActualStatus": "unverified",
+      "actualSupported": null,
+      "sourceContainerAndFields": [
+        "路径：Results.Analyses.BaselineCorrection.Feature(r).Difference，double，形状与目标特征一致。",
+        "定义/轴：同一条目 .FeatureDefinition / .DefinitionFingerprint / .AxisLabels。"
+      ],
+      "payloadAndShapeEvidence": [
+        "路径：Results.Analyses.BaselineCorrection.Feature(r).Difference，double，形状与目标特征一致。",
+        "差值矩阵是差值特征，不能继续当成 raw Pearson 相关或距离。"
+      ],
+      "sampleIdentity": {
+        "grain": "target_plus_reference",
+        "rule": "目标ObservationID为样本键；显式保存ReferenceRecordID/ObservationID来源链接，不按行序匹配。",
+        "source": "BaselineCorrection目标观察键及显式reference关联",
+        "keys": [
+          "ObservationID",
+          "TargetRecordID",
+          "ReferenceRecordID",
+          "FeatureDefinitionFingerprint"
+        ]
+      },
+      "hemoglobinRule": "继承并核对目标FeatureDefinition的Hb。",
+      "unitEvidence": [
+        "方案未声明统一物理单位；须按源算法定义与FeatureDefinition核实，不推断。"
+      ],
+      "parametersAndSupport": [
+        "要求：.SemanticType='feature_difference'，目标与参考来自一致特征定义、匹配身份和可用参考。"
+      ],
+      "allowedProjection": [
+        "用法：已认可的单节点/边等特征 task-minus-baseline 或预登记参照差值。"
+      ],
+      "explicitRejectsOrDeferrals": [
+        "差值矩阵是差值特征，不能继续当成 raw Pearson 相关或距离。",
+        "当前 DA BASELINE_CORRECTION 为 preview，需专门映射到 ML 列；校正来源元数据本身不作为特征。"
+      ],
+      "sourcePlanText": "29 已明确登记的特征基线差值 [B]\n路径：Results.Analyses.BaselineCorrection.Feature(r).Difference，double，形状与目标特征一致。\n定义/轴：同一条目 .FeatureDefinition / .DefinitionFingerprint / .AxisLabels。\n要求：.SemanticType='feature_difference'，目标与参考来自一致特征定义、匹配身份和可用参考。\n用法：已认可的单节点/边等特征 task-minus-baseline 或预登记参照差值。\n差值矩阵是差值特征，不能继续当成 raw Pearson 相关或距离。\n当前 DA BASELINE_CORRECTION 为 preview，需专门映射到 ML 列；校正来源元数据本身不作为特征。",
+      "sourceEvidence": {
+        "sourcePlan": "docs/PYfNIRs机器学习特征与数据组织方案_2026-10-08.txt",
+        "planLineStart": 291,
+        "planLineEnd": 297,
+        "sourceCodeFiles": [
+          "toolbox/+PYfNIRs/BaselineCorrection_pipeline.m",
+          "toolbox/+PYfNIRs/applyBaselineCorrection.m"
+        ]
+      }
+    },
+    {
+      "id": "30",
+      "name": "通用信号摘要",
+      "sourceCapabilityClass": "C",
+      "plannedStatus": "planned",
+      "converterActualStatus": "unverified",
+      "actualSupported": null,
+      "sourceContainerAndFields": [
+        "函数：calculateSignalFeatures，返回 MATLAB table，每信号一行。"
+      ],
+      "payloadAndShapeEvidence": [
+        "函数：calculateSignalFeatures，返回 MATLAB table，每信号一行。",
+        "SignalName 为 string 键，其余候选为 double。这里只选一套峰/谷名称，避免与同义极值列重复。"
+      ],
+      "sampleIdentity": {
+        "grain": "caller_keyed",
+        "rule": "调用者提供ObservationID/RecordID或PairObservationID及信号/节点身份；函数返回本身无样本键。",
+        "source": "函数调用方必须补充稳定记录/配对键和输入信号/边定义",
+        "keys": [
+          "ObservationID或PairObservationID",
+          "RecordID/PairID",
+          "SignalName/NodeA/NodeB"
+        ]
+      },
+      "hemoglobinRule": "调用者须显式登记输入CH/ROI/Hb。",
+      "unitEvidence": [
+        "可用候选列：Mean、Median、StandardDeviation、Rms、Range、PeakValue、PeakTimeSeconds、TroughValue、TroughTimeSeconds、AbsoluteArea、LinearSlope、Skewness、Kurtosis、ZeroCrossingRate。",
+        "要求：明确输入 CH/ROI/Hb、已验证采样率、共同时间窗、处理阶段和信号单位；AbsoluteArea 的时长可比，ZeroCrossingRate 按当前函数比例语义解释。"
+      ],
+      "parametersAndSupport": [
+        "要求：明确输入 CH/ROI/Hb、已验证采样率、共同时间窗、处理阶段和信号单位；AbsoluteArea 的时长可比，ZeroCrossingRate 按当前函数比例语义解释。",
+        "存储现状：返回表，没有自动固定文件；如实施，建议新增 SignalSummary.mat 的 SignalSummary 表，并连入 MLInput。"
+      ],
+      "allowedProjection": [
+        "函数：calculateSignalFeatures，返回 MATLAB table，每信号一行。",
+        "可用候选列：Mean、Median、StandardDeviation、Rms、Range、PeakValue、PeakTimeSeconds、TroughValue、TroughTimeSeconds、AbsoluteArea、LinearSlope、Skewness、Kurtosis、ZeroCrossingRate。",
+        "存储现状：返回表，没有自动固定文件；如实施，建议新增 SignalSummary.mat 的 SignalSummary 表，并连入 MLInput。"
+      ],
+      "explicitRejectsOrDeferrals": [
+        "未由本项方案确认的投影暂缓；仍遵守全局身份、缺失和防泄漏规则。"
+      ],
+      "sourcePlanText": "30 通用信号摘要 [C]\n函数：calculateSignalFeatures，返回 MATLAB table，每信号一行。\n可用候选列：Mean、Median、StandardDeviation、Rms、Range、PeakValue、PeakTimeSeconds、TroughValue、TroughTimeSeconds、AbsoluteArea、LinearSlope、Skewness、Kurtosis、ZeroCrossingRate。\nSignalName 为 string 键，其余候选为 double。这里只选一套峰/谷名称，避免与同义极值列重复。\n要求：明确输入 CH/ROI/Hb、已验证采样率、共同时间窗、处理阶段和信号单位；AbsoluteArea 的时长可比，ZeroCrossingRate 按当前函数比例语义解释。\n存储现状：返回表，没有自动固定文件；如实施，建议新增 SignalSummary.mat 的 SignalSummary 表，并连入 MLInput。",
+      "sourceEvidence": {
+        "sourcePlan": "docs/PYfNIRs机器学习特征与数据组织方案_2026-10-08.txt",
+        "planLineStart": 299,
+        "planLineEnd": 304,
+        "sourceCodeFiles": [
+          "toolbox/+PYfNIRs/calculateSignalFeatures.m"
+        ]
+      }
+    },
+    {
+      "id": "31",
+      "name": "单尺度样本熵",
+      "sourceCapabilityClass": "C",
+      "plannedStatus": "planned",
+      "converterActualStatus": "unverified",
+      "actualSupported": null,
+      "sourceContainerAndFields": [
+        "函数：calculateSampleEntropy，返回 double 标量。"
+      ],
+      "payloadAndShapeEvidence": [
+        "函数：calculateSampleEntropy，返回 double 标量。"
+      ],
+      "sampleIdentity": {
+        "grain": "caller_keyed",
+        "rule": "调用者提供ObservationID/RecordID或PairObservationID及信号/节点身份；函数返回本身无样本键。",
+        "source": "函数调用方必须补充稳定记录/配对键和输入信号/边定义",
+        "keys": [
+          "ObservationID或PairObservationID",
+          "RecordID/PairID",
+          "SignalName/NodeA/NodeB"
+        ]
+      },
+      "hemoglobinRule": "调用者须显式登记信号节点/Hb。",
+      "unitEvidence": [
+        "方案未声明统一物理单位；须按源算法定义与FeatureDefinition核实，不推断。"
+      ],
+      "parametersAndSupport": [
+        "要求：EmbeddingDimension、Tolerance 规则及有效样本长度一致，结果有限。",
+        "存储现状：没有自动固定 MAT 路径；如实施，新增明确节点/Hb/参数的长表保存。"
+      ],
+      "allowedProjection": [
+        "函数：calculateSampleEntropy，返回 double 标量。",
+        "存储现状：没有自动固定 MAT 路径；如实施，新增明确节点/Hb/参数的长表保存。"
+      ],
+      "explicitRejectsOrDeferrals": [
+        "与 SpEn 分开命名，不能相互替代；与 MSE scale=1 重复时只保留一套。"
+      ],
+      "sourcePlanText": "31 单尺度样本熵 [C]\n函数：calculateSampleEntropy，返回 double 标量。\n要求：EmbeddingDimension、Tolerance 规则及有效样本长度一致，结果有限。\n与 SpEn 分开命名，不能相互替代；与 MSE scale=1 重复时只保留一套。\n存储现状：没有自动固定 MAT 路径；如实施，新增明确节点/Hb/参数的长表保存。",
+      "sourceEvidence": {
+        "sourcePlan": "docs/PYfNIRs机器学习特征与数据组织方案_2026-10-08.txt",
+        "planLineStart": 306,
+        "planLineEnd": 310,
+        "sourceCodeFiles": [
+          "toolbox/+PYfNIRs/calculateSampleEntropy.m"
+        ]
+      }
+    },
+    {
+      "id": "32",
+      "name": "通用双信号连接摘要",
+      "sourceCapabilityClass": "C",
+      "plannedStatus": "planned",
+      "converterActualStatus": "unverified",
+      "actualSupported": null,
+      "sourceContainerAndFields": [
+        "函数：calculateConnectivityMetrics，返回 struct，各数值候选为 double 标量。"
+      ],
+      "payloadAndShapeEvidence": [
+        "函数：calculateConnectivityMetrics，返回 struct，各数值候选为 double 标量。"
+      ],
+      "sampleIdentity": {
+        "grain": "caller_keyed",
+        "rule": "调用者提供ObservationID/RecordID或PairObservationID及信号/节点身份；函数返回本身无样本键。",
+        "source": "函数调用方必须补充稳定记录/配对键和输入信号/边定义",
+        "keys": [
+          "ObservationID或PairObservationID",
+          "RecordID/PairID",
+          "SignalName/NodeA/NodeB"
+        ]
+      },
+      "hemoglobinRule": "调用者须显式登记两信号Hb/模态。",
+      "unitEvidence": [
+        "已有可用字段：Pearson、FisherZ、Spearman、BiweightMidcorrelation、PartialCorrelation、MaximumAbsoluteCrossCorrelation、SignedCrossCorrelationAtMaximum、LagSamples、LagSeconds、PLV、MeanPhaseDifferenceRadians、PLI、WeightedPLI、GaussianCopulaMutualInformationNats。",
+        "用法：按单脑边或跨脑边明确登记；Pearson/FisherZ 二选一，LagSamples/LagSeconds 二选一，角度用 sin/cos 编码。",
+        "GaussianCopulaMutualInformationNats 是 nats，与 FC model=4 的 MI_KDE 不是同一估计量。"
+      ],
+      "parametersAndSupport": [
+        "存储现状：这是函数返回结构，当前常规 FC/IBS Pipeline 不自动保存此函数的全部字段。"
+      ],
+      "allowedProjection": [
+        "用法：按单脑边或跨脑边明确登记；Pearson/FisherZ 二选一，LagSamples/LagSeconds 二选一，角度用 sin/cos 编码。"
+      ],
+      "explicitRejectsOrDeferrals": [
+        "未由本项方案确认的投影暂缓；仍遵守全局身份、缺失和防泄漏规则。"
+      ],
+      "sourcePlanText": "32 通用双信号连接摘要 [C]\n函数：calculateConnectivityMetrics，返回 struct，各数值候选为 double 标量。\n已有可用字段：Pearson、FisherZ、Spearman、BiweightMidcorrelation、PartialCorrelation、MaximumAbsoluteCrossCorrelation、SignedCrossCorrelationAtMaximum、LagSamples、LagSeconds、PLV、MeanPhaseDifferenceRadians、PLI、WeightedPLI、GaussianCopulaMutualInformationNats。\n用法：按单脑边或跨脑边明确登记；Pearson/FisherZ 二选一，LagSamples/LagSeconds 二选一，角度用 sin/cos 编码。\nPartialCorrelation 必须登记一致的混杂回归变量及处理规则。\nGaussianCopulaMutualInformationNats 是 nats，与 FC model=4 的 MI_KDE 不是同一估计量。\n存储现状：这是函数返回结构，当前常规 FC/IBS Pipeline 不自动保存此函数的全部字段。\n如实施，应新增明确键和 FeatureDefinition 的连接长表，而非假定这些字段都在现有 *-FC.mat 内。",
+      "sourceEvidence": {
+        "sourcePlan": "docs/PYfNIRs机器学习特征与数据组织方案_2026-10-08.txt",
+        "planLineStart": 312,
+        "planLineEnd": 319,
+        "sourceCodeFiles": [
+          "toolbox/+PYfNIRs/calculateConnectivityMetrics.m"
+        ]
+      }
+    }
+  ]
+}
