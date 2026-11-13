@@ -1,0 +1,11 @@
+.venv/
+/\_internal/
+/*.exe
+/*.zip
+build/
+dist/
+__pycache__/
+*.pyc
+last-error.log
+latest-run.json
+.pytest_cache/

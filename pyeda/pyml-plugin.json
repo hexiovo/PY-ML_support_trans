@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "id": "data-conversion",
+  "source_project": "PYEDA",
+  "name": "PYEDA EDA 数据转换器",
+  "version": "0.1.0",
+  "entrypoint": {
+    "kind": "python",
+    "path": "launch_eda.py"
+  }
+}
