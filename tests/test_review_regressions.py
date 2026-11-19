@@ -96,7 +96,7 @@ class HyperEegTests(unittest.TestCase):
             item = eeg.convert_tables(eeg.load_tables(source, opts), opts)
             eeg.write_package(item, root / "out", opts, source)
             manifest = json.loads((root / "out/provenance.json").read_text(encoding="utf-8"))
-            self.assertEqual(manifest["tables"][0]["source_path"], str(source))
+            self.assertEqual(manifest["tables"][0]["source_path"], str(source.resolve()))
             self.assertEqual(manifest["tables"][0]["source_sha256"], hashlib.sha256(source.read_bytes()).hexdigest())
             source.write_text("subject,x\ns1,31\ns2,2\n", encoding="utf-8")
             with self.assertRaisesRegex(eeg.ConversionError, "发生变化"):
