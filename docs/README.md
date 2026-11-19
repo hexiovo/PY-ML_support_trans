@@ -2,24 +2,18 @@
 
 仓库：[PY-ML_support_trans](https://github.com/hexiovo/PY-ML_support_trans)。
 
-仓库提供三个转换器及使用文档：
+仓库根目录包含四个内容目录：
 
 - `docs`：使用说明、兼容范围、验证摘要和 `version.md`。
 - `hypereeg`：HyperEEG 转换器源码、启动入口、依赖清单和构建配置。
 - `pyfnirs`：PYfNIRs 转换器源码、启动入口、依赖清单和构建配置。
-- `pyeda`：[PYEDA EDA 转换器](../pyeda/README.md)源码及构建入口，Windows 成品在 Release 提供。
+- `pyeda`：PYEDA EDA 结果包转换器源码、启动入口和标准库运行配置。
 
-GitHub 上传源码和文档。本机的 EXE、`_internal` 依赖目录及成品清单保留在各自转换器目录，通过目录内的 `.gitignore` 排除，不提交到 Git。GitHub 不包含 `prompts`、`tests`、测试工具或开发环境。
+GitHub 上传源码和文档。本机的 EXE、`_internal` 依赖目录及成品清单保留在各自转换器目录，通过目录内的 `.gitignore` 排除，不提交到 Git。仓库的 `tests/` 使用合成数据验证转换契约和界面。
 
-## 本机插件选择
+## 插件目录选择
 
-在 PY-ML 中选择以下目录：
-
-- HyperEEG：`F:\桌面\程序\PY-ML-support\hypereeg`，对应“插件 → 设置…”。
-- PYfNIRs：`F:\桌面\程序\PY-ML-support\pyfnirs`，对应“格式 → 数据转换 → PYfNIRs 设置…”。
-- PYEDA：在 PYML 的“插件 → 设置…”选择解压后的 PYEDA 插件目录。使用源码时，选择 `pyeda` 目录及 Python 3.12 的 `pythonw.exe`。
-
-每个本机目录均保留 EXE、`pyml-plugin.json` 和完整 `_internal`，无需指定外部 Python。只复制 EXE 无法运行；从 GitHub 克隆的源码需要自行安装依赖并构建，不包含本机成品。
+在 PYML 的“插件 → 设置…”中，为对应转换器选择含 EXE、`pyml-plugin.json` 和完整 `_internal` 的目录。源码版本须准备对应的 Python 3.12 环境。PYEDA 源码目录提供 Python 入口清单。
 
 操作方法：[HyperEEG 使用说明](HyperEEG使用说明.md)、[PYfNIRs 使用说明](PYfNIRs转换器使用说明.md)。能力边界见[兼容矩阵](compatibility.md)，版本变更见[版本记录](version.md)。原始数据和转换结果留在本地。
 

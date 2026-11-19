@@ -54,6 +54,7 @@ class ApiWorker(QThread):
                     self.path,
                     source_adapter_id=self.source_adapter_id,
                     matlab_executable=self.matlab_executable,
+                    cancel_event=self.cancel_event,
                 )
             elif self.action == "preview":
                 if self.path is None or self.selection is None:
@@ -62,6 +63,7 @@ class ApiWorker(QThread):
                     self.path,
                     self.selection,
                     matlab_executable=self.matlab_executable,
+                    cancel_event=self.cancel_event,
                 )
             elif self.action == "batch":
                 if self.request is None:

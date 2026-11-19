@@ -4,7 +4,7 @@
 
 从 [Release](https://github.com/hexiovo/PY-ML_support_trans/releases) 下载 Windows ZIP 并完整解压。双击 `PYEDA-DataConversion.exe`，或在 PYML 的“插件 → 设置…”中选择包含 EXE、`pyml-plugin.json` 与 `_internal/` 的目录。源码版可在设置中选择本 `pyeda` 目录和 Python 3.12 的 `pythonw.exe`。
 
-输入目录包含 `manifest.json`、`summary.json`、`intake/analysis_settings.json`、`intake/feature_definitions.csv` 和对应来源的 `features/participant_task_role_features.csv`、`features/participant_feature_exposure.csv` 或 `features/records/*.csv.gz`。批处理使用 Python 标准库。
+输入目录包含 `manifest.json`、`summary.json`、`intake/analysis_settings.json`、`intake/feature_definitions.csv` 和对应来源的 `features/participant_task_role_features.csv`、`features/participant_feature_exposure.csv` 或 `features/records/*.csv.gz`。默认要求选中的数据、设置、特征定义和摘要均有匹配的清单 SHA-256。缺少清单的历史输入可显式使用 `--no-verify-hashes`，来源仍会记录为未核验。批处理使用 Python 标准库。
 
 ```powershell
 python -X utf8 launch_eda.py --input <PYEDA结果目录> --inspect

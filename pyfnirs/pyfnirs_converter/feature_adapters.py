@@ -764,8 +764,8 @@ def _candidate_static_fc(document: Mapping[str, Any]) -> api.FeatureCandidate | 
             if _shape(matrix, f"{root_path}.{hb}") != (len(nodes), len(nodes)):
                 raise AdapterError(f"{hb} FC matrix shape does not match saved node order")
             values = _numeric_vector(matrix, f"{root_path}.{hb}")
-            if not _symmetric(values, len(nodes), tolerance=1e-12):
-                raise AdapterError(f"{hb} FC matrix is not symmetric within saved precision")
+            if not _valid_pearson_matrix(values, len(nodes)):
+                raise AdapterError(f"{hb} FC matrix is not symmetric or contains a coefficient outside [-1, 1]")
         if not parameter_fingerprint:
             raise AdapterError("FC parameter fingerprint is missing")
         status, reason = _candidate_status("07", "Pearson static FC matrix, node order, and parameters are present.")
@@ -1129,10 +1129,12 @@ def _select_static_fc(
     matrix = _resolve_raw_node(document, matrix_path)
     values = _numeric_vector(matrix, matrix_path)
     size = len(nodes)
-    if _shape(matrix, matrix_path) != (size, size) or not _symmetric(values, size, 1e-12):
-        raise AdapterError("Pearson FC matrix shape or symmetry disagrees with its saved node order")
+    if _shape(matrix, matrix_path) != (size, size) or not _valid_pearson_matrix(values, size):
+        raise AdapterError("Pearson FC matrix must match its saved node order, be symmetric, and contain coefficients in [-1, 1]")
     i, j = nodes.index(node_a), nodes.index(node_b)
     value = values[i + j * size]
+    if math.isfinite(value):
+        value = min(1.0, max(-1.0, value))  # Clip only within the tolerance accepted above.
     definition = _definition(
         feature,
         metric="StaticFC_Pearson",
@@ -1529,8 +1531,11 @@ def _numeric_vector(node: Mapping[str, Any], label: str) -> tuple[float, ...]:
     return tuple(float(value) for value in values)
 
 
-def _symmetric(values: Sequence[float], size: int, tolerance: float) -> bool:
-    if len(values) != size * size:
+def _valid_pearson_matrix(values: Sequence[float], size: int) -> bool:
+    tolerance = 1e-12
+    if len(values) != size * size or any(
+        not math.isnan(value) and abs(value) > 1 + tolerance for value in values
+    ):
         return False
     for row in range(size):
         for column in range(row + 1, size):

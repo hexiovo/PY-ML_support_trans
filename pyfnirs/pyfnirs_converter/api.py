@@ -186,6 +186,7 @@ def inspect_source(
     *,
     source_adapter_id: str | None = None,
     matlab_executable: Path | None = None,
+    cancel_event=None,
 ) -> SourceInspection:
     """Inspect a source without guessing identity, target, or feature choices."""
     from .core import inspect_source as implementation
@@ -194,6 +195,7 @@ def inspect_source(
         path,
         source_adapter_id=source_adapter_id,
         matlab_executable=matlab_executable,
+        cancel_event=cancel_event,
     )
 
 
@@ -202,11 +204,12 @@ def preview_conversion(
     selection: ConversionSelection,
     *,
     matlab_executable: Path | None = None,
+    cancel_event=None,
 ) -> ConversionPreview:
     """Preview a conversion without writing files."""
     from .core import preview_conversion as implementation
 
-    return implementation(path, selection, matlab_executable=matlab_executable)
+    return implementation(path, selection, matlab_executable=matlab_executable, cancel_event=cancel_event)
 
 
 def convert_export(

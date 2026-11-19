@@ -33,6 +33,8 @@ class _App(tk.Tk):
         self.events: queue.Queue[tuple[str, object]] = queue.Queue()
         self.cancel = threading.Event()
         self.worker: threading.Thread | None = None
+        self._close_requested = False
+        self.protocol("WM_DELETE_WINDOW", self._close)
         self._build()
 
     def _build(self) -> None:
@@ -129,7 +131,8 @@ class _App(tk.Tk):
                     self._finish()
                     self.stage_var.set("转换完成")
                     self._append(f"完成：{payload['output']}")
-                    messagebox.showinfo("转换完成", f"已写入：\n{payload['output']}")
+                    if not self._close_requested:
+                        messagebox.showinfo("转换完成", f"已写入：\n{payload['output']}")
                 elif kind == "cancelled":
                     self._finish()
                     self.stage_var.set("已取消；部分输出已标记为 cancelled")
@@ -138,11 +141,22 @@ class _App(tk.Tk):
                     self._finish()
                     self.stage_var.set("转换失败")
                     self._append(str(payload))
-                    messagebox.showerror("转换失败", str(payload))
+                    if not self._close_requested:
+                        messagebox.showerror("转换失败", str(payload))
         except queue.Empty:
             pass
-        if str(self.start_button.cget("state")) == "disabled":
+        if self._close_requested and (self.worker is None or not self.worker.is_alive()):
+            self.destroy()
+            return
+        if self._close_requested or str(self.start_button.cget("state")) == "disabled":
             self.after(100, self._poll)
+
+    def _close(self) -> None:
+        if self.worker is not None and self.worker.is_alive():
+            self._close_requested = True
+            self._cancel()
+            return
+        self.destroy()
 
     def _cancel(self) -> None:
         self.cancel.set()

@@ -9,6 +9,8 @@ explicitly in ``intake/analysis_settings.json``.
 from __future__ import annotations
 
 import csv
+from contextlib import contextmanager
+import gzip
 from dataclasses import dataclass, asdict
 from datetime import datetime, timezone
 import hashlib
@@ -17,14 +19,12 @@ import math
 import os
 from pathlib import Path
 import re
-import shutil
 import tempfile
 import threading
-import uuid
 from typing import Any, Callable, Iterable, Mapping
 
 
-CORE_VERSION = "0.1.0"
+CORE_VERSION = "0.1.1"
 MANIFEST_NAME = "pyml-plugin.json"
 IDENTITY_COLUMNS = {
     "participant_task_role": (
@@ -135,78 +135,54 @@ def _read_json(path: Path) -> dict[str, Any]:
     return payload
 
 
-def _read_csv(path: Path) -> tuple[list[str], list[dict[str, str]]]:
+@contextmanager
+def _open_csv(path: Path):
+    opener = gzip.open if path.suffix == ".gz" else open
     try:
-        with path.open("r", encoding="utf-8-sig", newline="") as stream:
-            reader = csv.DictReader(stream)
+        with opener(path, "rt", encoding="utf-8-sig", newline="") as stream:
+            reader = csv.DictReader(stream, strict=True)
             headers = list(reader.fieldnames or [])
-            if not headers or any(not h for h in headers):
-                raise ConversionError(f"CSV 缺少有效表头：{path}")
-            if len(headers) != len(set(headers)):
-                raise ConversionError(f"CSV 存在重复列名：{path}")
-            rows = [dict(row) for row in reader]
-    except ConversionError:
-        raise
-    except (OSError, UnicodeError, csv.Error) as exc:
+            if not headers or any(not name for name in headers) or len(headers) != len(set(headers)):
+                raise ConversionError(f"CSV 缺少有效表头或存在重复列名：{path}")
+
+            def rows():
+                for row in reader:
+                    if None in row or any(value is None for value in row.values()):
+                        raise ConversionError(f"CSV 第 {reader.line_num} 行列数不匹配：{path}")
+                    yield row
+
+            yield headers, rows()
+    except (OSError, EOFError, UnicodeError, csv.Error) as exc:
         raise ConversionError(f"无法读取 CSV：{path}：{exc}") from exc
-    return headers, rows
 
 
-def _read_gzip_csv(path: Path) -> tuple[list[str], Iterable[dict[str, str]]]:
-    import gzip
-
-    try:
-        stream = gzip.open(path, "rt", encoding="utf-8-sig", newline="")
-        reader = csv.DictReader(stream)
-        headers = list(reader.fieldnames or [])
-        if not headers or len(headers) != len(set(headers)):
-            stream.close()
-            raise ConversionError(f"压缩 CSV 缺少或重复表头：{path}")
-        return headers, _closing_rows(stream, reader)
-    except ConversionError:
-        raise
-    except (OSError, UnicodeError, csv.Error) as exc:
-        raise ConversionError(f"无法读取压缩 CSV：{path}：{exc}") from exc
+def _check_cancel(cancel: threading.Event | None) -> None:
+    if cancel is not None and cancel.is_set():
+        raise ConversionCancelled("用户取消了转换")
 
 
-def _closing_rows(stream: Any, reader: Iterable[dict[str, str]]) -> Iterable[dict[str, str]]:
-    try:
-        yield from reader
-    finally:
-        stream.close()
-
-
-def _sha256(path: Path) -> str:
+def _sha256(path: Path, cancel: threading.Event | None = None) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as stream:
         for block in iter(lambda: stream.read(1024 * 1024), b""):
+            _check_cancel(cancel)
             digest.update(block)
     return digest.hexdigest()
 
 
 def _manifest_index(root: Path) -> tuple[dict[str, Any], dict[str, str]]:
-    manifest_path = root / "manifest.json"
-    manifest = _read_json(manifest_path)
+    manifest = _read_json(root / "manifest.json")
     entries = manifest.get("artifacts", [])
     if not isinstance(entries, list):
         raise ConversionError("manifest.json 的 artifacts 必须是数组")
     index: dict[str, str] = {}
     for item in entries:
         if isinstance(item, dict) and isinstance(item.get("path"), str) and isinstance(item.get("sha256"), str):
-            index[item["path"].replace("\\", "/")] = item["sha256"]
+            relative = item["path"].replace(chr(92), "/")
+            if relative in index:
+                raise ConversionError(f"清单中的路径重复：{relative}")
+            index[relative] = item["sha256"].lower()
     return manifest, index
-
-
-def _verify_hash(root: Path, rel: str, expected: str, *, required: bool) -> dict[str, Any]:
-    path = root / Path(rel)
-    if not path.is_file():
-        if required:
-            raise ConversionError(f"清单中的输入文件不存在：{rel}")
-        return {"path": rel, "status": "missing"}
-    actual = _sha256(path)
-    if expected and actual != expected:
-        raise ConversionError(f"来源文件哈希不一致：{rel}")
-    return {"path": rel, "status": "verified", "sha256": actual}
 
 
 def _finite(value: str) -> bool:
@@ -241,26 +217,33 @@ def _require_bundle(root: Path) -> None:
         raise ConversionError("不是完整的 PYEDA 结果包，缺少：" + ", ".join(missing))
 
 
-def _schema(root: Path, options: ConversionOptions) -> dict[str, Any]:
-    _require_bundle(root)
-    manifest, manifest_hashes = _manifest_index(root)
+def _schema(root: Path, options: ConversionOptions, manifest: dict[str, Any]) -> dict[str, Any]:
     settings = _read_json(root / "intake/analysis_settings.json")
     features = settings.get("features")
     outcomes = settings.get("outcomes", [])
-    if not isinstance(features, list) or not all(isinstance(x, str) and x for x in features):
+    if not isinstance(features, list) or not features or not all(isinstance(x, str) and x.strip() for x in features):
         raise ConversionError("analysis_settings.json 的 features 必须是非空字符串数组")
     if not isinstance(outcomes, list) or not all(isinstance(x, str) and x for x in outcomes):
         raise ConversionError("analysis_settings.json 的 outcomes 必须是字符串数组")
-    def_headers, def_rows = _read_csv(root / "intake/feature_definitions.csv")
-    if "feature" not in def_headers:
-        raise ConversionError("feature_definitions.csv 缺少 feature 列")
-    definitions = {row.get("feature", ""): row for row in def_rows if row.get("feature")}
+    if len(features) != len(set(features)) or len(outcomes) != len(set(outcomes)):
+        raise ConversionError("analysis_settings.json 存在重复特征或结果名")
+    definitions = {}
+    with _open_csv(root / "intake/feature_definitions.csv") as (def_headers, def_rows):
+        if "feature" not in def_headers:
+            raise ConversionError("feature_definitions.csv 缺少 feature 列")
+        for row in def_rows:
+            name = row["feature"]
+            if not name.strip() or name in definitions:
+                raise ConversionError(f"特征定义为空或重复：{name!r}")
+            definitions[name] = row
+    missing = [name for name in features if name not in definitions]
+    if missing:
+        raise ConversionError("特征定义表缺少已登记特征：" + ", ".join(missing))
     source_rel = SOURCE_FILES[options.source]
     if options.source != "records" and not (root / source_rel).is_file():
         raise ConversionError(f"缺少所选特征表：{source_rel}")
     return {
         "manifest": manifest,
-        "manifest_hashes": manifest_hashes,
         "settings": settings,
         "features": list(features),
         "outcomes": list(outcomes),
@@ -274,18 +257,21 @@ def inspect_bundle(root: Path | str, options: ConversionOptions | None = None) -
     """Inspect a bundle without writing output or changing source files."""
     root = Path(root).expanduser().resolve()
     options = options or ConversionOptions()
-    schema = _schema(root, options)
+    _require_bundle(root)
+    manifest, _ = _manifest_index(root)
+    schema = _schema(root, options, manifest)
     if options.source == "records":
         files = sorted((root / schema["source_rel"]).glob("*.csv.gz"))
         if options.max_record_files:
             files = files[:options.max_record_files]
         if not files:
             raise ConversionError("features/records 中没有 .csv.gz 文件")
-        headers, _ = _read_gzip_csv(files[0])
+        with _open_csv(files[0]) as (headers, _):
+            pass
         row_count = None
     else:
-        headers, rows = _read_csv(root / schema["source_rel"])
-        row_count = len(rows)
+        with _open_csv(root / schema["source_rel"]) as (headers, rows):
+            row_count = sum(1 for _ in rows)
     identity = IDENTITY_COLUMNS[options.source]
     missing_identity = [column for column in identity if column not in headers]
     missing_features = [name for name in schema["features"] if name not in headers]
@@ -303,17 +289,6 @@ def inspect_bundle(root: Path | str, options: ConversionOptions | None = None) -
     }
 
 
-def _write_csv(path: Path, headers: list[str], rows: Iterable[Mapping[str, Any]]) -> int:
-    with path.open("w", encoding="utf-8-sig", newline="") as stream:
-        writer = csv.DictWriter(stream, fieldnames=headers, extrasaction="raise")
-        writer.writeheader()
-        count = 0
-        for row in rows:
-            writer.writerow({key: "" if value is None else value for key, value in row.items()})
-            count += 1
-    return count
-
-
 def _selected_columns(headers: list[str], schema: dict[str, Any], options: ConversionOptions) -> tuple[list[str], list[str], list[str]]:
     identity = list(IDENTITY_COLUMNS[options.source])
     missing_identity = [column for column in identity if column not in headers]
@@ -326,14 +301,16 @@ def _selected_columns(headers: list[str], schema: dict[str, Any], options: Conve
     return identity, list(schema["features"]), outcomes
 
 
-def _build_rows(
+def _write_tables(
     rows: Iterable[Mapping[str, str]],
     headers: list[str],
     schema: dict[str, Any],
     options: ConversionOptions,
     progress: _Progress,
     cancel: threading.Event | None,
-) -> tuple[list[str], list[dict[str, str]], list[dict[str, str]], dict[str, Any]]:
+    data_stream,
+    mask_stream,
+) -> dict[str, Any]:
     identity, features, outcomes = _selected_columns(headers, schema, options)
     metadata = (
         [column for column in headers if column not in identity and column not in features and column not in schema["outcomes"]]
@@ -345,8 +322,10 @@ def _build_rows(
     target_columns = [f"target__{column}" for column in outcomes]
     data_headers = ["sample_id", *[f"meta__{column}" for column in identity], *meta_columns, *feature_columns, *target_columns]
     mask_headers = ["sample_id", *feature_columns, *target_columns]
-    output_rows: list[dict[str, str]] = []
-    mask_rows: list[dict[str, str]] = []
+    data_writer = csv.DictWriter(data_stream, fieldnames=data_headers)
+    mask_writer = csv.DictWriter(mask_stream, fieldnames=mask_headers)
+    data_writer.writeheader()
+    mask_writer.writeheader()
     seen: set[str] = set()
     source_status: dict[str, int] = {}
     total = 0
@@ -354,8 +333,7 @@ def _build_rows(
     missing_feature_cells = 0
     missing_target_cells = 0
     for total, source_row in enumerate(rows, 1):
-        if cancel is not None and cancel.is_set():
-            raise ConversionCancelled("用户取消了转换")
+        _check_cancel(cancel)
         status = str(source_row.get("status", "")).strip()
         source_status[status or "unspecified"] = source_status.get(status or "unspecified", 0) + 1
         if options.source == "records" and options.only_valid_records and status != "valid":
@@ -384,15 +362,15 @@ def _build_rows(
             ok = _finite(value)
             mask[f"target__{column}"] = "1" if ok else "0"
             missing_target_cells += int(not ok)
-        output_rows.append(row)
-        mask_rows.append(mask)
+        data_writer.writerow(row)
+        mask_writer.writerow(mask)
         valid += 1
         if total % 100 == 0:
             progress.update("读取并筛选", total, max(total, 1), f"已保留 {valid} 行")
-    if not output_rows:
+    if not valid:
         raise ConversionError("所选来源没有可转换的有效行")
     # Verify the composite identity is unique at the source semantic level.
-    return data_headers, output_rows, mask_rows, {
+    return {
         "input_rows": total, "output_rows": valid, "source_status": source_status,
         "metadata_columns": metadata, "features": features, "outcomes": outcomes,
         "missing_feature_cells": missing_feature_cells,
@@ -404,7 +382,7 @@ def _feature_dictionary(schema: dict[str, Any], info: dict[str, Any], options: C
     definitions = schema["definitions"]
     features = []
     for name in info["features"]:
-        definition = dict(definitions.get(name, {}))
+        definition = dict(definitions[name])
         definition.update({"source_column": name, "output_column": f"feature__{name}"})
         features.append(definition)
     targets = [
@@ -424,43 +402,42 @@ def _feature_dictionary(schema: dict[str, Any], info: dict[str, Any], options: C
     }
 
 
-def _source_hashes(root: Path, schema: dict[str, Any], options: ConversionOptions, progress: _Progress) -> list[dict[str, Any]]:
-    rels = ["manifest.json", "summary.json", "intake/analysis_settings.json", "intake/feature_definitions.csv", schema["source_rel"]]
+def _source_hashes(root, manifest_hashes, options, progress, cancel):
+    rels = ["manifest.json", "summary.json", "intake/analysis_settings.json", "intake/feature_definitions.csv"]
+    source = root / SOURCE_FILES[options.source]
     if options.source == "records":
-        files = sorted((root / schema["source_rel"]).glob("*.csv.gz"))
-        if options.max_record_files:
-            files = files[:options.max_record_files]
+        files = sorted(source.glob("*.csv.gz"))[:options.max_record_files]
         if not files:
             raise ConversionError("features/records 中没有 .csv.gz 文件")
-        rels = ["manifest.json", "summary.json", "intake/analysis_settings.json", "intake/feature_definitions.csv"] + [str(p.relative_to(root)).replace("\\", "/") for p in files]
+    else:
+        files = [source]
+    rels.extend(path.relative_to(root).as_posix() for path in files)
     results = []
-    total = len(rels)
-    manifest_hashes = schema["manifest_hashes"]
     for index, rel in enumerate(rels, 1):
-        expected = manifest_hashes.get(rel, "")
+        _check_cancel(cancel)
         path = root / rel
-        if not path.is_file():
-            raise ConversionError(f"缺少输入文件：{rel}")
-        if not options.verify_manifest_hashes:
-            results.append({"path": rel, "status": "not_verified", "sha256": _sha256(path)})
-        elif rel != "manifest.json" and not expected:
-            # A source not committed into the manifest is still recorded, but is
-            # visibly unverified instead of being treated as trusted.
-            results.append({"path": rel, "status": "not_in_manifest", "sha256": _sha256(path)})
-        else:
-            results.append(_verify_hash(root, rel, expected, required=True))
-        progress.update("核对来源哈希", index, total, rel)
-    return results
+        if not path.is_file() or not path.resolve().is_relative_to(root):
+            raise ConversionError(f"输入文件缺失或位于结果包外：{rel}")
+        actual = _sha256(path, cancel)
+        status = "captured" if rel == "manifest.json" else "not_verified"
+        if options.verify_manifest_hashes and rel != "manifest.json":
+            if not manifest_hashes.get(rel):
+                raise ConversionError(f"来源文件缺少清单哈希：{rel}")
+            if actual != manifest_hashes[rel]:
+                raise ConversionError(f"来源文件哈希不一致：{rel}")
+            status = "verified"
+        results.append({"path": rel, "status": status, "sha256": actual})
+        progress.update("核对来源哈希", index, len(rels), rel)
+    return results, files
 
 
-def _verify_source_unchanged(root: Path, source_hashes: list[dict[str, Any]], progress: _Progress) -> None:
-    total = len(source_hashes)
+def _verify_source_unchanged(root, source_hashes, progress, cancel):
     for index, item in enumerate(source_hashes, 1):
+        _check_cancel(cancel)
         path = root / item["path"]
-        actual = _sha256(path)
-        if actual != item.get("sha256"):
+        if _sha256(path, cancel) != item["sha256"]:
             raise ConversionError(f"转换期间来源文件发生变化：{item['path']}")
-        progress.update("复核来源未变更", index, total, item["path"])
+        progress.update("复核来源未变更", index, len(source_hashes), item["path"])
 
 
 def _new_run_dir(output: Path) -> Path:
@@ -481,48 +458,64 @@ def convert_bundle(
 ) -> dict[str, Any]:
     """Convert a PYEDA bundle and return the persisted batch summary."""
     root = Path(root).expanduser().resolve()
-    output = _new_run_dir(Path(output))
+    output = Path(output).expanduser().resolve()
+    if output.is_relative_to(root):
+        raise ConversionError("输出目录必须位于 PYEDA 输入包之外")
+    output = _new_run_dir(output)
+    lock_path = output / ".conversion.lock"
+    with lock_path.open("x"):
+        pass
     options = options or ConversionOptions()
-    progress = _Progress(output, progress_callback)
+    published_tables = []
     try:
+        if any(path != lock_path for path in output.iterdir()):
+            raise ConversionError(f"输出目录必须为空：{output}")
+    except Exception:
+        lock_path.unlink(missing_ok=True)
+        raise
+    try:
+        progress = _Progress(output, progress_callback)
         progress.update("检查输入契约", 0, 1, str(root))
-        schema = _schema(root, options)
-        source_hashes = _source_hashes(root, schema, options, progress)
-        if options.source == "records":
-            files = sorted((root / schema["source_rel"]).glob("*.csv.gz"))
-            if options.max_record_files:
-                files = files[:options.max_record_files]
-            headers, _ = _read_gzip_csv(files[0])
-            # Re-open each file lazily to avoid loading the complete event table.
-            def rows() -> Iterable[dict[str, str]]:
-                for index, path in enumerate(files, 1):
-                    if cancel_event is not None and cancel_event.is_set():
-                        raise ConversionCancelled("用户取消了转换")
-                    file_headers, iterator = _read_gzip_csv(path)
+        _require_bundle(root)
+        before_manifest = _sha256(root / "manifest.json", cancel_event)
+        manifest, manifest_hashes = _manifest_index(root)
+        source_hashes, files = _source_hashes(root, manifest_hashes, options, progress, cancel_event)
+        if before_manifest != source_hashes[0]["sha256"]:
+            raise ConversionError("读取时来源清单发生变化")
+        schema = _schema(root, options, manifest)
+        source_summary = _read_json(root / "summary.json")
+        with _open_csv(files[0]) as (headers, _):
+            pass
+
+        def rows():
+            for index, path in enumerate(files, 1):
+                _check_cancel(cancel_event)
+                with _open_csv(path) as (file_headers, iterator):
                     if file_headers != headers:
                         raise ConversionError(f"记录文件表头不一致：{path.name}")
-                    for row in iterator:
-                        yield row
-                    progress.update("读取记录文件", index, len(files), path.name)
-            rows = rows()
-        else:
-            source_path = root / schema["source_rel"]
-            headers, source_rows = _read_csv(source_path)
-            rows = iter(source_rows)
-        data_headers, data_rows, mask_rows, info = _build_rows(
-            rows, headers, schema, options, progress, cancel_event
-        )
-        progress.update("写入数据表", 0, 3, "dataset.csv")
-        _write_csv(output / "dataset.csv", data_headers, data_rows)
-        progress.update("写入数据表", 1, 3, "valid_mask.csv")
-        _write_csv(output / "valid_mask.csv", ["sample_id", *[c for c in data_headers if c.startswith(("feature__", "target__"))]], mask_rows)
-        progress.update("写入数据表", 2, 3, "feature_dictionary.json")
-        dictionary = _feature_dictionary(schema, info, options)
-        (output / "feature_dictionary.json").write_text(json.dumps(dictionary, ensure_ascii=False, indent=2), encoding="utf-8")
-        progress.update("写入数据表", 3, 3, "完成")
-        _verify_source_unchanged(root, source_hashes, progress)
-        source_summary = _read_json(root / "summary.json")
-        manifest = schema["manifest"]
+                    yield from iterator
+                progress.update("读取来源文件", index, len(files), path.name)
+
+        with tempfile.TemporaryDirectory(prefix=".tables-", dir=output) as work:
+            staged = Path(work)
+            with (staged / "dataset.csv").open("w", encoding="utf-8-sig", newline="") as data, (
+                staged / "valid_mask.csv"
+            ).open("w", encoding="utf-8-sig", newline="") as mask:
+                stream = rows()
+                try:
+                    info = _write_tables(stream, headers, schema, options, progress, cancel_event, data, mask)
+                finally:
+                    stream.close()
+            dictionary = _feature_dictionary(schema, info, options)
+            (staged / "feature_dictionary.json").write_text(
+                json.dumps(dictionary, ensure_ascii=False, indent=2), encoding="utf-8"
+            )
+            _verify_source_unchanged(root, source_hashes, progress, cancel_event)
+            _check_cancel(cancel_event)
+            for name in ("dataset.csv", "valid_mask.csv", "feature_dictionary.json"):
+                destination = output / name
+                (staged / name).rename(destination)
+                published_tables.append(destination)
         provenance = {
             "schema_version": 1, "plugin": {"name": "PYEDA EDA 数据转换器", "version": CORE_VERSION},
             "source_project": "PYEDA", "input_root": str(root), "output_root": str(output),
@@ -560,7 +553,6 @@ def convert_bundle(
             "target_status": provenance["target_status"], "training": "NOT RUN", "statistics": "NOT RUN",
             "files": ["dataset.csv", "valid_mask.csv", "feature_dictionary.json", "provenance.json", "conversion.plan.json"],
         }
-        (output / "batch_summary.json").write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")
         (output / "转换结果.txt").write_text(
             "PYEDA EDA 特征转换完成。\n"
             f"数据表：{output / 'dataset.csv'}\n"
@@ -569,14 +561,16 @@ def convert_bundle(
             encoding="utf-8-sig",
         )
         progress.finish("completed_supported_tables", str(output))
+        (output / "batch_summary.json").write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")
         return summary
-    except ConversionCancelled as exc:
-        partial = {"status": "cancelled", "input": str(root), "output": str(output), "error": str(exc)}
-        (output / "batch_summary.json").write_text(json.dumps(partial, ensure_ascii=False, indent=2), encoding="utf-8")
-        progress.finish("cancelled", str(exc))
-        raise
     except Exception as exc:
-        failure = {"status": "failed", "input": str(root), "output": str(output), "error": str(exc)}
+        for path in published_tables:
+            path.unlink(missing_ok=True)
+        status = "cancelled" if isinstance(exc, ConversionCancelled) else "failed"
+        failure = {"status": status, "input": str(root), "output": str(output), "error": str(exc)}
         (output / "batch_summary.json").write_text(json.dumps(failure, ensure_ascii=False, indent=2), encoding="utf-8")
-        progress.finish("failed", str(exc))
+        if "progress" in locals():
+            progress.finish(status, str(exc))
         raise
+    finally:
+        lock_path.unlink(missing_ok=True)

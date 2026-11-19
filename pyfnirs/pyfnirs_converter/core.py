@@ -672,10 +672,11 @@ def inspect_source(
     *,
     source_adapter_id: str | None = None,
     matlab_executable: Path | None = None,
+    cancel_event=None,
 ) -> api.SourceInspection:
     source = Path(path).expanduser().resolve()
     document, adapter_id = load_source_document(
-        source, source_adapter_id=source_adapter_id, matlab_executable=matlab_executable
+        source, source_adapter_id=source_adapter_id, matlab_executable=matlab_executable, cancel_event=cancel_event
     )
     try:
         return feature_adapters.inspect_document(document, source, adapter_id)
@@ -688,11 +689,12 @@ def preview_conversion(
     selection: api.ConversionSelection,
     *,
     matlab_executable: Path | None = None,
+    cancel_event=None,
 ) -> api.ConversionPreview:
     _validate_selection(selection)
     source = Path(path).expanduser().resolve()
     document, adapter_id = load_source_document(
-        source, source_adapter_id=selection.source_adapter_id, matlab_executable=matlab_executable
+        source, source_adapter_id=selection.source_adapter_id, matlab_executable=matlab_executable, cancel_event=cancel_event
     )
     payload = _convert_document(
         document,

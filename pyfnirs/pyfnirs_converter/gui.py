@@ -293,6 +293,7 @@ class ConversionWindow(QMainWindow):
         self.setWindowTitle("PYfNIRs → PY-ML 批量转换")
         self.resize(1180, 900)
         self._worker: ApiWorker | None = None
+        self._close_requested = False
         self._active_action: str | None = None
         self._inspection: api.SourceInspection | None = None
         self._source_files: list[Path] = []
@@ -638,6 +639,8 @@ class ConversionWindow(QMainWindow):
         return _normal_path(Path(text)) if text else None
 
     def _on_worker_completed(self, action: str, result: Any) -> None:
+        if self._close_requested:
+            return
         if action == "inspect":
             self._inspection_ready(result)
         elif action == "preview":
@@ -646,6 +649,8 @@ class ConversionWindow(QMainWindow):
             self._show_batch_result(result)
 
     def _on_worker_failed(self, action: str, message: str) -> None:
+        if self._close_requested:
+            return
         if action == "inspect":
             self._clear_inspection(f"来源检查失败：{message}", preserve_adapter=True)
         elif action == "preview":
@@ -662,6 +667,9 @@ class ConversionWindow(QMainWindow):
         self._active_action = None
         if isinstance(worker, ApiWorker):
             worker.deleteLater()
+        if self._close_requested:
+            self.close()
+            return
         self.scan_button.setEnabled(True)
         self.adapter_combo.setEnabled(bool(self._source_files))
         self.sample_combo.setEnabled(bool(self._source_files))
@@ -673,6 +681,15 @@ class ConversionWindow(QMainWindow):
         self.cancel_button.setText("取消批处理")
         has_inspection = self._inspection is not None
         self._set_data_controls_enabled(has_inspection)
+
+    def closeEvent(self, event) -> None:
+        if self._worker is not None:
+            self._close_requested = True
+            self._worker.cancel()
+            self.progress_message.setText("正在停止后台任务，任务退出后会关闭窗口。")
+            event.ignore()
+            return
+        super().closeEvent(event)
 
     def _launch_worker(self, worker: ApiWorker) -> None:
         if self._worker is not None:

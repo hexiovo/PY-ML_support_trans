@@ -9,6 +9,7 @@ import os
 import shutil
 import subprocess
 import tempfile
+import time
 import threading
 import uuid
 from dataclasses import asdict, dataclass
@@ -50,6 +51,7 @@ class Options:
     join_columns: tuple[str, ...] = ()
     target: str = ""
     metadata_only: bool = False
+    matlab_timeout_seconds: float = 900.0
 
 
 @dataclass
@@ -58,6 +60,8 @@ class Table:
     origin: str
     role: str = "feature"
     native: dict | None = None
+    source_path: Path | None = None
+    source_sha256: str | None = None
 
 
 @dataclass
@@ -159,7 +163,28 @@ def find_matlab(selected: str) -> str:
     return found
 
 
+def _stop_matlab(process):
+    if os.name == "nt":
+        try:
+            subprocess.run(["taskkill", "/PID", str(process.pid), "/T", "/F"],
+                           capture_output=True, timeout=5, creationflags=subprocess.CREATE_NO_WINDOW)
+        except (OSError, subprocess.TimeoutExpired):
+            pass
+    if process.poll() is None:
+        process.kill()
+    try:
+        process.wait(timeout=5)
+    except subprocess.TimeoutExpired as exc:
+        raise ConversionError("MATLAB 未能在限定时间内退出。") from exc
+
+
 def native_mat(path: Path, options: Options, cancel=None) -> list[Table]:
+    path = path.resolve()
+    check_cancel(cancel)
+    source_sha = digest_file(path)
+    if not math.isfinite(options.matlab_timeout_seconds) or options.matlab_timeout_seconds <= 0:
+        raise ConversionError("MATLAB 超时必须是有限正数。")
+    stop = cancel if cancel is not None else threading.Event()
     bridge = Path(__file__).resolve().parent / "matlab"
     with tempfile.TemporaryDirectory(prefix="pyml-hypereeg-") as temporary:
         root = Path(temporary)
@@ -173,21 +198,17 @@ def native_mat(path: Path, options: Options, cancel=None) -> list[Table]:
                 [find_matlab(options.matlab), "-wait", "-batch", expression], stdout=log, stderr=log,
                 creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
             )
+            deadline = time.monotonic() + options.matlab_timeout_seconds
             try:
                 while process.poll() is None:
-                    if cancel is not None and cancel.wait(0.15):
-                        if os.name == "nt":
-                            subprocess.run(["taskkill", "/PID", str(process.pid), "/T", "/F"], capture_output=True)
-                        else:
-                            process.terminate()
-                        process.wait()
-                        check_cancel(cancel)
-                    if cancel is None:
-                        threading.Event().wait(0.15)
+                    remaining = deadline - time.monotonic()
+                    if remaining <= 0:
+                        raise ConversionError(f"MATLAB 读取超时（{options.matlab_timeout_seconds:g} 秒）。")
+                    stop.wait(min(0.15, remaining))
+                    check_cancel(cancel)
             finally:
                 if process.poll() is None:
-                    process.terminate()
-                    process.wait()
+                    _stop_matlab(process)
         if process.returncode:
             message = log_path.read_text(encoding="utf-8", errors="replace")[-4000:]
             raise ConversionError(f"MATLAB 读取失败：{message}")
@@ -207,15 +228,28 @@ def native_mat(path: Path, options: Options, cancel=None) -> list[Table]:
             if "__source_id" in frame:
                 raise ConversionError("载荷使用了保留列 __source_id。")
             frame["__source_id"] = text(source_ids[0])
-        return [Table(frame, f"{path}#{native['path']}", "feature", native)]
+        if digest_file(path) != source_sha:
+            raise ConversionError(f"转换期间来源文件发生变化：{path}")
+        return [Table(frame, f"{path}#{native['path']}", "feature", native, path, source_sha)]
 
 
 def load_tables(path: Path, options: Options, cancel=None) -> list[Table]:
+    path = path.resolve()
     check_cancel(cancel)
     if path.suffix.casefold() == ".csv":
-        return [Table(read_csv(path), str(path))]
+        before = digest_file(path)
+        table = Table(read_csv(path), str(path), source_path=path, source_sha256=before)
+        if digest_file(path) != before:
+            raise ConversionError(f"转换期间来源文件发生变化：{path}")
+        return [table]
     if path.suffix.casefold() == ".xlsx":
+        before = digest_file(path)
         tables = read_xlsx(path, options.sheet)
+        if digest_file(path) != before:
+            raise ConversionError(f"转换期间来源文件发生变化：{path}")
+        for table in tables:
+            table.source_path = path
+            table.source_sha256 = before
         # Current formal workbooks contain paths, not numerical observations.
         indexes = [item for item in tables if item.origin.endswith("#特征文件清单")]
         if indexes and not options.metadata_only:
@@ -414,7 +448,7 @@ def merge_converted(items: list[Converted]) -> Converted:
     return merged
 
 
-def attach_metadata(item: Converted, options: Options):
+def attach_metadata(item: Converted, options: Options) -> str | None:
     if not options.metadata:
         if options.target:
             for sample in item.samples:
@@ -453,6 +487,7 @@ def attach_metadata(item: Converted, options: Options):
             raise ConversionError("指定标签列不存在或标签缺失。")
         if options.target:
             sample.pop("meta__" + options.target, None)
+    return matches[0].source_sha256
 
 
 def dataset_frame(item: Converted) -> pd.DataFrame:
@@ -475,20 +510,28 @@ def write_package(item: Converted, destination: Path, options: Options, source: 
     raw = destination / "source_tables"
     raw.mkdir()
     raw_files = []
+    source_hashes = {}
+    for table in item.tables:
+        if table.source_path is None:
+            continue
+        if table.source_path not in source_hashes:
+            source_hashes[table.source_path] = digest_file(table.source_path)
+        if source_hashes[table.source_path] != table.source_sha256:
+            raise ConversionError(f"转换期间来源文件发生变化：{table.source_path}")
     for number, table in enumerate(item.tables, start=1):
         check_cancel(cancel)
         filename = f"table_{number:04d}.csv"
         write_csv(table.frame, raw / filename)
-        origin_file = Path(table.origin.split("#", 1)[0])
-        raw_files.append({"file": "source_tables/" + filename, "origin": table.origin, "role": table.role, "shape": list(table.frame.shape), "native": table.native, "source_sha256": digest_file(origin_file) if origin_file.is_file() else None})
+        raw_files.append({"file": "source_tables/" + filename, "origin": table.origin, "role": table.role, "shape": list(table.frame.shape), "native": table.native, "source_path": str(table.source_path) if table.source_path else None, "source_sha256": table.source_sha256})
+    metadata_sha = None
     if item.cells:
-        attach_metadata(item, options)
+        metadata_sha = attach_metadata(item, options)
         frame = dataset_frame(item)
         write_csv(frame, destination / "dataset.csv")
         mask = pd.DataFrame([{ "sample_id": sample["sample_id"], **{column: int(numeric(item.cells.get((sample["_key"], column), ""))) for column in item.features}} for sample in item.samples])
         write_csv(mask, destination / "valid_mask.csv")
         (destination / "feature_dictionary.json").write_text(json.dumps(list(item.features.values()), ensure_ascii=False, indent=2), encoding="utf-8")
-    manifest = {"schema_version": 1, "converter": "HyperEEG", "version": __version__, "created_at": datetime.now().astimezone().isoformat(), "options": asdict(options), "source": str(source) if source else "merged", "source_sha256": digest_file(source) if source else None, "rows": len(item.samples), "features": len(item.features), "sample_columns": item.sample_columns, "tables": raw_files, "feature_columns": list(item.features), "target_column": "target__" + options.target if options.target else None, "metadata_source_sha256": digest_file(Path(options.metadata)) if options.metadata else None, "qa_policy": "原始状态/质量列保留为元数据；valid_mask=1仅表示数值有限。训练前须按真实资格筛选。", "missing_policy": "保留空值/NaN/Inf及掩码；未插补、归一化、重算或拟合。"}
+    manifest = {"schema_version": 1, "converter": "HyperEEG", "version": __version__, "created_at": datetime.now().astimezone().isoformat(), "options": asdict(options), "source": str(source) if source else "merged", "source_sha256": source_hashes.get(source.resolve()) if source else None, "rows": len(item.samples), "features": len(item.features), "sample_columns": item.sample_columns, "tables": raw_files, "feature_columns": list(item.features), "target_column": "target__" + options.target if options.target else None, "metadata_source_sha256": metadata_sha, "qa_policy": "原始状态/质量列保留为元数据；valid_mask=1仅表示数值有限。训练前须按真实资格筛选。", "missing_policy": "保留空值/NaN/Inf及掩码；未插补、归一化、重算或拟合。"}
     (destination / "provenance.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
     check_cancel(cancel)
 
@@ -564,7 +607,8 @@ def batch(source: Path, output: Path, options: Options, cancel=None, progress: C
             write_package(item, staging, options, path, cancel)
             destination = run / f"{number:04d}_{path.stem[:60]}"
             staging.rename(destination)
-            items.append(item)
+            if options.merge and not options.metadata_only:
+                items.append(item)
             record = {"source": str(path), "status": "成功", "output": str(destination), "rows": len(item.samples), "features": len(item.features)}
             summary["success"] += 1
         except Cancelled:
